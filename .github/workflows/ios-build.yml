@@ -6,6 +6,9 @@ name: iOS build
 #   gh workflow run ios-build.yml
 on:
   workflow_dispatch:
+  push:
+    # Also build every release tag, e.g. `git tag v1.0 && git push --tags`.
+    tags: ['v*']
 
 jobs:
   build:
