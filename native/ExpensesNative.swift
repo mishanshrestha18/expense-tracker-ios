@@ -1,10 +1,10 @@
 // A tiny bridge for the few things JavaScript cannot do on its own. The file
 // name has to match the module name for Expo's inline modules to find it.
 
-import ExpoModulesCore
+internal import ExpoModulesCore
 import UserNotifications
 
-public class ExpensesNative: Module {
+class ExpensesNative: Module {
   public func definition() -> ModuleDefinition {
     Name("ExpensesNative")
 

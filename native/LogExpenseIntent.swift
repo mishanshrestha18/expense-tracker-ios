@@ -83,9 +83,9 @@ struct LogExpenseIntent: AppIntent {
 
     let added = "Added \(Money.pounds(pence)) to \(name)."
     guard let left = Budget()?.leftLine(category: name) else {
-      return .result(dialog: IntentDialog(stringLiteral: added))
+      return .result(dialog: "\(added)")
     }
-    return .result(dialog: IntentDialog(stringLiteral: "\(added) \(left)"))
+    return .result(dialog: "\(added) \(left)")
   }
 }
 
@@ -131,9 +131,9 @@ struct AddPaymentIntent: AppIntent {
         title: "\(Money.pounds(pence))\(where_)", body: left ?? "Added to Expenses.")
     }
     guard let left else {
-      return .result(dialog: IntentDialog(stringLiteral: added))
+      return .result(dialog: "\(added)")
     }
-    return .result(dialog: IntentDialog(stringLiteral: "\(added) \(left)"))
+    return .result(dialog: "\(added) \(left)")
   }
 }
 
@@ -164,9 +164,9 @@ struct QuickAddIntent: AppIntent {
           .joined(separator: " and ")
         let onlyCategory = items.count == 1 ? items[0].category : nil
         guard let left = Budget()?.leftLine(category: onlyCategory) else {
-          return .result(dialog: IntentDialog(stringLiteral: "Added \(summary)."))
+          return .result(dialog: "Added \(summary).")
         }
-        return .result(dialog: IntentDialog(stringLiteral: "Added \(summary). \(left)"))
+        return .result(dialog: "Added \(summary). \(left)")
       }
     #endif
 
@@ -194,14 +194,14 @@ struct BudgetLeftIntent: AppIntent {
     let spentText = "You've spent \(Money.pounds(spent)) on \(name) this \(budget.noun)"
 
     guard let limit = budget.limitPence(category: name) else {
-      return .result(dialog: IntentDialog(stringLiteral: "\(spentText). It has no budget yet."))
+      return .result(dialog: "\(spentText). It has no budget yet.")
     }
     let remaining = limit - spent
     let line =
       remaining >= 0
       ? "\(Money.pounds(remaining)) left for \(name) this \(budget.noun). \(spentText) of \(Money.pounds(limit))."
       : "\(Money.pounds(-remaining)) over on \(name). \(spentText), and the budget is \(Money.pounds(limit))."
-    return .result(dialog: IntentDialog(stringLiteral: line))
+    return .result(dialog: "\(line)")
   }
 }
 
@@ -218,16 +218,12 @@ struct SpendTodayIntent: AppIntent {
     let spent = Money.pounds(budget.totalSpentPence)
     guard let remaining = budget.remainingPence else {
       return .result(
-        dialog: IntentDialog(
-          stringLiteral:
-            "You've spent \(spent) this \(budget.noun). Set a monthly budget in Expenses and I can tell you what's left."
+        dialog: "You've spent \(spent) this \(budget.noun). Set a monthly budget in Expenses and I can tell you what's left."
         ))
     }
     guard remaining >= 0 else {
       return .result(
-        dialog: IntentDialog(
-          stringLiteral:
-            "You're \(Money.pounds(-remaining)) over budget this \(budget.noun), with \(spent) spent."
+        dialog: "You're \(Money.pounds(-remaining)) over budget this \(budget.noun), with \(spent) spent."
         ))
     }
 
@@ -240,7 +236,7 @@ struct SpendTodayIntent: AppIntent {
     if budget.upcomingPence > 0 {
       line += " That's after \(Money.pounds(budget.upcomingPence)) of fees still to come out."
     }
-    return .result(dialog: IntentDialog(stringLiteral: line))
+    return .result(dialog: "\(line)")
   }
 }
 
