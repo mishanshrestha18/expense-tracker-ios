@@ -218,13 +218,15 @@ struct SpendTodayIntent: AppIntent {
     let spent = Money.pounds(budget.totalSpentPence)
     guard let remaining = budget.remainingPence else {
       return .result(
-        dialog: "You've spent \(spent) this \(budget.noun). Set a monthly budget in Expenses and I can tell you what's left."
-        ))
+        dialog:
+          "You've spent \(spent) this \(budget.noun). Set a monthly budget in Expenses and I can tell you what's left."
+      )
     }
     guard remaining >= 0 else {
       return .result(
-        dialog: "You're \(Money.pounds(-remaining)) over budget this \(budget.noun), with \(spent) spent."
-        ))
+        dialog:
+          "You're \(Money.pounds(-remaining)) over budget this \(budget.noun), with \(spent) spent."
+      )
     }
 
     let days = budget.daysLeft ?? 0
