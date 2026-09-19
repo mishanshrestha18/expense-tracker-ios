@@ -8,7 +8,23 @@ import { DEFAULT_CATEGORIES } from '@/db/schema';
 import type { Db } from '@/db/types';
 import { createTestDb } from '@/test-utils/sqljs-db';
 
-import { importInboxEntries, parseInboxEntry } from '../inbox';
+import { importInboxEntries, type InboxEntry, parseInboxEntry } from '../inbox';
+
+const siri = (amountPence: number, category: string, spentOn: string): InboxEntry => ({
+  amountPence,
+  category,
+  merchant: '',
+  note: '',
+  spentOn,
+});
+
+const payment = (amountPence: number, merchant: string, note = merchant): InboxEntry => ({
+  amountPence,
+  category: '',
+  merchant,
+  note,
+  spentOn: '2026-09-19',
+});
 
 describe('parseInboxEntry', () => {
   it('reads what the Swift intent writes', () => {
@@ -18,11 +34,22 @@ describe('parseInboxEntry', () => {
       spentOn: '2026-09-19',
       createdAt: '2026-09-19T08:30:00Z',
     });
-    expect(parseInboxEntry(json)).toEqual({
-      amountPence: 28500,
-      category: 'Groceries',
+    expect(parseInboxEntry(json)).toEqual(siri(28500, 'Groceries', '2026-09-19'));
+  });
+
+  it('reads an Apple Pay payment, amount as Wallet formats it', () => {
+    const json = JSON.stringify({
+      amountText: '£3.50',
+      merchant: ' Pret A Manger ',
       spentOn: '2026-09-19',
+      createdAt: '2026-09-19T08:30:00Z',
     });
+    expect(parseInboxEntry(json)).toEqual(payment(350, 'Pret A Manger'));
+  });
+
+  it('keeps a foreign amount in the note', () => {
+    const json = JSON.stringify({ amountText: '€12.00', merchant: 'Café', spentOn: '2026-09-19' });
+    expect(parseInboxEntry(json)).toEqual(payment(1200, 'Café', 'Café (€12.00)'));
   });
 
   it.each([
@@ -35,6 +62,12 @@ describe('parseInboxEntry', () => {
     ['zero amount', JSON.stringify({ amountPence: 0, category: 'Bills', spentOn: '2026-09-19' })],
     ['missing category', JSON.stringify({ amountPence: 100, spentOn: '2026-09-19' })],
     ['bad date', JSON.stringify({ amountPence: 100, category: 'Bills', spentOn: '19/09/2026' })],
+    ['a refund', JSON.stringify({ amountText: '-£3.50', merchant: 'Pret', spentOn: '2026-09-19' })],
+    [
+      'a zero payment',
+      JSON.stringify({ amountText: '£0.00', merchant: 'TfL', spentOn: '2026-09-19' }),
+    ],
+    ['no amount at all', JSON.stringify({ merchant: 'Pret', spentOn: '2026-09-19' })],
   ])('rejects %s', (_label, text) => {
     expect(parseInboxEntry(text)).toBeNull();
   });
@@ -53,8 +86,8 @@ describe('importInboxEntries', () => {
 
   it('adds expenses, matching categories case-insensitively', async () => {
     const added = await importInboxEntries(db, [
-      { amountPence: 28500, category: 'groceries', spentOn: '2026-09-19' },
-      { amountPence: 420, category: 'Eating out', spentOn: '2026-09-18' },
+      siri(28500, 'groceries', '2026-09-19'),
+      siri(420, 'Eating out', '2026-09-18'),
     ]);
     expect(added).toBe(2);
 
@@ -68,10 +101,29 @@ describe('importInboxEntries', () => {
   });
 
   it('files unknown categories under Other rather than losing them', async () => {
-    await importInboxEntries(db, [{ amountPence: 999, category: 'Pets', spentOn: '2026-09-19' }]);
+    await importInboxEntries(db, [siri(999, 'Pets', '2026-09-19')]);
     const [expense] = await listExpensesInMonth(db, '2026-09');
     const other = (await listCategories(db)).find((c) => c.name === 'Other');
     expect(expense.categoryId).toBe(other?.id);
+  });
+
+  it('picks the category of an Apple Pay payment from the merchant', async () => {
+    await importInboxEntries(db, [
+      payment(6420, 'TESCO STORES 3021'),
+      payment(350, 'Pret A Manger'),
+      payment(1500, 'Blue Door Ltd'),
+    ]);
+    const categories = await listCategories(db);
+    const nameOf = (id: number) => categories.find((c) => c.id === id)?.name;
+    const expenses = await listExpensesInMonth(db, '2026-09');
+    expect(expenses.map((e) => [e.amountPence, nameOf(e.categoryId), e.note])).toEqual(
+      expect.arrayContaining([
+        [6420, 'Groceries', 'TESCO STORES 3021'],
+        [350, 'Eating out', 'Pret A Manger'],
+        [1500, 'Other', 'Blue Door Ltd'],
+      ]),
+    );
+    expect(expenses).toHaveLength(3);
   });
 
   it('does nothing for an empty inbox', async () => {

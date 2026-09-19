@@ -6,6 +6,7 @@ import {
   formatPenceShort,
   MAX_AMOUNT_PENCE,
   parseAmountToPence,
+  parseWalletAmount,
   penceToInputValue,
 } from '../money';
 
@@ -37,6 +38,23 @@ describe('parseAmountToPence', () => {
   it('rejects amounts above the maximum', () => {
     expect(parseAmountToPence(String(MAX_AMOUNT_PENCE / 100 + 1))).toBeNull();
     expect(parseAmountToPence(String(MAX_AMOUNT_PENCE / 100))).toBe(MAX_AMOUNT_PENCE);
+  });
+});
+
+describe('parseWalletAmount', () => {
+  it.each([
+    ['£3.50', { pence: 350, foreign: false }],
+    ['£1,234.56', { pence: 123456, foreign: false }],
+    [' £12 ', { pence: 1200, foreign: false }],
+    ['3.50 GBP', { pence: 350, foreign: false }],
+    ['€12.00', { pence: 1200, foreign: true }],
+    ['US$4.99', { pence: 499, foreign: true }],
+  ])('reads %s', (text, expected) => {
+    expect(parseWalletAmount(text)).toEqual(expected);
+  });
+
+  it.each([['-£3.50'], ['−£3.50'], ['£0.00'], [''], ['free']])('rejects %s', (text) => {
+    expect(parseWalletAmount(text)).toBeNull();
   });
 });
 

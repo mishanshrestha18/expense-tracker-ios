@@ -38,31 +38,70 @@ One-time setup:
 Each install:
 
 1. Connect the iPhone with a cable, unlock it and tap **Trust** if asked.
-2. Open Sideloadly, drag `Expenses.ipa` in, enter your Apple ID, press **Start**,
-   and enter the verification code Apple sends you.
-3. On the iPhone, the first time only, in this order:
+2. Open Sideloadly and drag `Expenses.ipa` in. Under **Advanced Options**, untick
+   **Use automatic bundle ID** and leave the ID as `com.nicklane123.expenses`.
+   Siri only recognises the app under its own ID.
+3. Enter your Apple ID, press **Start**, and enter the verification code Apple
+   sends you.
+4. On the iPhone, the first time only, in this order:
    - **Settings → Privacy & Security → Developer Mode** → on, then restart the
      phone and confirm. The switch only appears once an app has been sideloaded.
    - **Settings → General → VPN & Device Management** → under **Developer App**,
      tap your Apple ID → **Trust**.
-4. Open **Expenses** once.
+5. Open **Expenses** once.
 
 ## 3. Use Siri
 
-- "Hey Siri, log groceries in Expenses" → "How much?" → "285"
-- "Hey Siri, record eating out in Expenses"
-- "Hey Siri, log an expense in Expenses" (Siri asks for the category, then the amount)
+The first time, turn on Siri for the app: open Expenses and say one of the
+phrases below. Siri asks **Turn on "Expenses" shortcuts with Siri?** — tap
+**Turn On**. (Or: Shortcuts app → **Shortcuts** tab → **Expenses** → turn on
+**Siri**.) Until then Siri answers "Expenses hasn't added support for that with
+Siri".
 
-Siri replies "Logged £285.00 to Groceries." The expense appears the next time
-you open the app. The phrases also show up in the Shortcuts app, where you can
-add a shortcut to the Action Button or Back Tap.
+Say the category, and Siri asks how much:
+
+- "Hey Siri, add groceries to my expenses" → "How much?" → "285"
+- "Hey Siri, add eating out to my budget"
+- "Hey Siri, add to my expenses" (Siri asks for the category, then the amount)
+
+"My expenses", "my budget", "my spending" and "Expenses" all work as the app's
+name. Siri replies "Added £285.00 to Groceries." and the expense appears the next
+time you open the app.
+
+To use your own words, make a personal shortcut: in the Shortcuts app, tap **+**,
+add the **Add Expense** action and name the shortcut something like "I spent
+money". Then "Hey Siri, I spent money" asks for the category and the amount. The
+shortcut also works from the Action Button or Back Tap.
+
+## 4. Add Apple Pay payments automatically
+
+A Wallet automation can add every Apple Pay payment you make with the iPhone,
+with its amount and the shop's name:
+
+1. In the Shortcuts app, open **Automation** → **+** → **Transaction**.
+2. Pick the cards to watch, choose **Run Immediately**, then tap **Next**.
+3. Choose **New Blank Automation**, tap **Add Action**, search for **Expenses**
+   and pick **Add Apple Pay Payment**.
+4. Tap **Amount** → **Shortcut Input**, then tap the new **Shortcut Input** and
+   pick **Amount**. Do the same for **Merchant**, picking **Merchant**.
+5. Tap **Done**.
+
+The app files each payment by the shop's name (Tesco → Groceries, Pret → Eating
+out, TfL → Transport, …) and keeps the name as the note. Shops it doesn't know go
+under Other, and you can change the category in the app. Payments in other
+currencies are added as they are, with the original amount in the note. Refunds
+and £0.00 transit taps are skipped.
+
+iOS only sees payments made with Apple Pay on the iPhone. Tapping a physical card
+doesn't involve the phone, so those payments can't be added automatically.
 
 ## Every 7 days
 
 Free installs stop opening after 7 days. Connect the phone and press **Start**
-again in Sideloadly with the same `.ipa`; installing over the top keeps all your
-data. Sideloadly's auto-refresh option can do this for you over Wi‑Fi while the
-PC is on. Deleting the app deletes its data.
+again in Sideloadly with the same `.ipa`, with **Use automatic bundle ID** still
+unticked; installing over the top keeps all your data. Sideloadly's auto-refresh
+option can do this for you over Wi‑Fi while the PC is on. Deleting the app deletes
+its data.
 
 ## Limits of a free Apple ID
 

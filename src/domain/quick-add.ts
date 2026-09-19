@@ -107,6 +107,11 @@ export function parseQuickAdd(
   };
 }
 
+/** The category a piece of text mentions by name or alias, e.g. "Tesco Express" → Groceries. */
+export function matchCategory(text: string, categories: readonly CategoryMatcher[]): number | null {
+  return findCategory(tokenize(text), new Set(), categories)?.id ?? null;
+}
+
 function tokenize(text: string): Token[] {
   return text
     .replace(/£\s+(?=\d)/g, '£') // "£ 285" → "£285"

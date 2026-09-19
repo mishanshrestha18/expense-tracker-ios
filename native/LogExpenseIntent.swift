@@ -1,8 +1,10 @@
-// Siri support: "Hey Siri, log groceries in Expenses" → "How much?" → "285".
+// Siri support: "Hey Siri, add groceries to my expenses" → "How much?" → "285".
+// Apple Pay support: a Wallet "Transaction" automation in the Shortcuts app runs
+// AddPaymentIntent each time you pay, with the amount and the merchant.
 //
 // App Intents run inside the app's process without opening it. Instead of
 // writing to the app's SQLite database directly (a second copy of SQLite in the
-// same process can corrupt a shared file), the intent drops each expense into
+// same process can corrupt a shared file), the intents drop each expense into
 // Documents/siri-inbox/ as a small JSON file. The app imports and removes those
 // files whenever it becomes active; see src/siri/inbox.ts.
 //
@@ -54,7 +56,7 @@ enum ExpenseCategory: String, AppEnum {
 }
 
 struct LogExpenseIntent: AppIntent {
-  static let title: LocalizedStringResource = "Log Expense"
+  static let title: LocalizedStringResource = "Add Expense"
 
   @Parameter(title: "Category", requestValueDialog: "Which category?")
   var category: ExpenseCategory
@@ -67,9 +69,44 @@ struct LogExpenseIntent: AppIntent {
     guard pence > 0, pence <= 100_000_000 else {
       throw LogExpenseError.invalidAmount
     }
-    try SiriInbox.add(amountPence: pence, category: category.storedName)
+    try SiriInbox.add(SiriInbox.Entry(amountPence: pence, category: category.storedName))
     let spoken = SiriInbox.formatPounds(pence)
-    return .result(dialog: "Logged \(spoken) to \(category.storedName).")
+    return .result(dialog: "Added \(spoken) to \(category.storedName).")
+  }
+}
+
+/// Records an Apple Pay payment the moment you tap, without opening the app.
+/// Meant for a Wallet "Transaction" automation in the Shortcuts app. The app
+/// picks the category from the merchant when it next opens.
+struct AddPaymentIntent: AppIntent {
+  static let title: LocalizedStringResource = "Add Apple Pay Payment"
+  static let description: IntentDescription? = IntentDescription(
+    "Adds a payment to Expenses. Use it in a Wallet transaction automation and pass the transaction's Amount and Merchant."
+  )
+
+  /// Wallet passes the amount as formatted text, such as "£3.50"; the app parses it.
+  @Parameter(title: "Amount")
+  var amount: String
+
+  @Parameter(title: "Merchant")
+  var merchant: String?
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    let amountText = amount.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Transit taps can report £0.00 and refunds are negative. Skip them quietly
+    // rather than failing, so the automation doesn't show an error each time.
+    if amountText.contains("-") || amountText.contains("−") {
+      return .result(dialog: "Refunds aren't added.")
+    }
+    guard amountText.rangeOfCharacter(from: CharacterSet(charactersIn: "123456789")) != nil else {
+      return .result(dialog: "No amount to add.")
+    }
+    let place = (merchant ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    try SiriInbox.add(SiriInbox.Entry(amountText: amountText, merchant: place))
+    if place.isEmpty {
+      return .result(dialog: "Added \(amountText).")
+    }
+    return .result(dialog: "Added \(amountText) at \(place).")
   }
 }
 
@@ -84,32 +121,42 @@ enum LogExpenseError: Error, CustomLocalizedStringResourceConvertible {
   }
 }
 
+/// Every phrase has to name the app. `.applicationName` also matches the
+/// alternative names in app.json (`INAlternativeAppNames`): "my expenses",
+/// "my budget" and "my spending".
 struct ExpensesShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(
       intent: LogExpenseIntent(),
       phrases: [
-        "Log \(\.$category) in \(.applicationName)",
-        "Record \(\.$category) in \(.applicationName)",
         "Add \(\.$category) to \(.applicationName)",
-        "Log an expense in \(.applicationName)",
+        "Add \(\.$category) in \(.applicationName)",
+        "Record \(\.$category) in \(.applicationName)",
+        "Log \(\.$category) in \(.applicationName)",
+        "Add to \(.applicationName)",
         "Add an expense to \(.applicationName)",
+        "New expense in \(.applicationName)",
       ]
     )
   }
 }
 
-/// Hands expenses from Siri to the app through small JSON files.
+/// Hands expenses from Siri and Apple Pay to the app through small JSON files.
 enum SiriInbox {
-  struct Entry: Codable {
-    let amountPence: Int
-    let category: String
+  /// Siri sends `amountPence` and `category`. Apple Pay payments send
+  /// `amountText` as Wallet formats it and the `merchant`; the app works out
+  /// the pence and the category.
+  struct Entry: Encodable {
+    var amountPence: Int?
+    var amountText: String?
+    var category: String?
+    var merchant: String?
     /// Local calendar date, `yyyy-MM-dd`.
-    let spentOn: String
-    let createdAt: String
+    var spentOn = ""
+    var createdAt = ""
   }
 
-  static func add(amountPence: Int, category: String) throws {
+  static func add(_ entry: Entry) throws {
     let directory = try FileManager.default
       .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
       .appendingPathComponent("siri-inbox", isDirectory: true)
@@ -122,13 +169,10 @@ enum SiriInbox {
     day.timeZone = TimeZone.current
     day.dateFormat = "yyyy-MM-dd"
 
-    let entry = Entry(
-      amountPence: amountPence,
-      category: category,
-      spentOn: day.string(from: now),
-      createdAt: ISO8601DateFormatter().string(from: now)
-    )
-    let data = try JSONEncoder().encode(entry)
+    var dated = entry
+    dated.spentOn = day.string(from: now)
+    dated.createdAt = ISO8601DateFormatter().string(from: now)
+    let data = try JSONEncoder().encode(dated)
     // One file per expense, written atomically, so the app never reads half a file.
     try data.write(to: directory.appendingPathComponent("\(UUID().uuidString).json"), options: .atomic)
   }

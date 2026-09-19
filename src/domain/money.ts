@@ -61,6 +61,20 @@ export function parseAmountToPence(input: string): number | null {
   return validPence(pounds * 100 + pence);
 }
 
+/**
+ * Parses an amount as the Wallet "Transaction" automation passes it: formatted
+ * text such as `"£3.50"`, `"£1,234.56"` or `"€12.00"`. `foreign` is true when
+ * the amount is not in pounds, so the caller can flag it. Refunds (negative
+ * amounts) and zero return `null`.
+ */
+export function parseWalletAmount(text: string): { pence: number; foreign: boolean } | null {
+  const trimmed = text.trim();
+  if (/[-−]/.test(trimmed)) return null;
+  const withoutCode = trimmed.replace(/gbp/gi, '');
+  const pence = parseAmountToPence(withoutCode.replace(/[^\d.,]/g, ''));
+  return pence === null ? null : { pence, foreign: /[^\d\s.,£]/.test(withoutCode) };
+}
+
 function validPence(pence: number): number | null {
   return Number.isInteger(pence) && pence > 0 && pence <= MAX_AMOUNT_PENCE ? pence : null;
 }

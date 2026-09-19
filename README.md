@@ -19,8 +19,10 @@ Everything is stored on the device. No account, no server.
 - **Native feel** — iOS tab bar (Liquid Glass on iOS 26+), modal sheets, the native date picker,
   haptics, light and dark mode, and VoiceOver labels throughout.
 - **Offline-first** — SQLite on the device with versioned schema migrations.
-- **Siri** — "Hey Siri, log groceries in Expenses" → "How much?" → "285", through a native
+- **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285", through a native
   Swift App Intent ([native/LogExpenseIntent.swift](native/LogExpenseIntent.swift)).
+- **Apple Pay, automatically** — a Wallet automation hands each Apple Pay payment to the app,
+  which files it by merchant (Tesco → Groceries, Pret → Eating out) and keeps the shop as the note.
 
 ## Tech stack
 
@@ -110,7 +112,8 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 
 ## Roadmap
 
-- [x] **Siri** — "Hey Siri, log groceries in Expenses" → "How much?" → "285".
+- [x] **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285".
+- [x] **Apple Pay** — payments added automatically through a Wallet transaction automation.
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).
 - [ ] **Action Button and Back Tap** — one press, say "285 groceries", done.

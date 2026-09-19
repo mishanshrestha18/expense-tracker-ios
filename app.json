@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.nicklane123.expenses"
+      "bundleIdentifier": "com.nicklane123.expenses",
+      "infoPlist": {
+        "INAlternativeAppNames": [
+          { "INAlternativeAppName": "My Expenses" },
+          { "INAlternativeAppName": "My Budget" },
+          { "INAlternativeAppName": "My Spending" }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
