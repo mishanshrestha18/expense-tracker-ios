@@ -19,18 +19,22 @@ Everything is stored on the device. No account, no server.
 - **Native feel** — iOS tab bar (Liquid Glass on iOS 26+), modal sheets, the native date picker,
   haptics, light and dark mode, and VoiceOver labels throughout.
 - **Offline-first** — SQLite on the device with versioned schema migrations.
+- **Siri** — "Hey Siri, log groceries in Expenses" → "How much?" → "285", through a native
+  Swift App Intent ([native/LogExpenseIntent.swift](native/LogExpenseIntent.swift)).
 
 ## Tech stack
 
-| Area       | Choice                                                                              |
-| ---------- | ----------------------------------------------------------------------------------- |
-| App        | Expo SDK 57, React Native 0.86, React 19.2 with the React Compiler                  |
-| Language   | TypeScript 6 in strict mode                                                         |
-| Navigation | Expo Router (file-based), native tabs and modal screens                             |
-| Storage    | `expo-sqlite` with versioned migrations; money stored as integer pence              |
-| Charts     | Hand-rolled SVG with `react-native-svg`; the geometry is unit tested                |
-| Testing    | Jest (`jest-expo`) + `sql.js`, so repository tests run against a real SQLite engine |
-| Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                       |
+| Area       | Choice                                                                               |
+| ---------- | ------------------------------------------------------------------------------------ |
+| App        | Expo SDK 57, React Native 0.86, React 19.2 with the React Compiler                   |
+| Language   | TypeScript 6 in strict mode                                                          |
+| Navigation | Expo Router (file-based), native tabs and modal screens                              |
+| Storage    | `expo-sqlite` with versioned migrations; money stored as integer pence               |
+| Charts     | Hand-rolled SVG with `react-native-svg`; the geometry is unit tested                 |
+| Testing    | Jest (`jest-expo`) + `sql.js`, so repository tests run against a real SQLite engine  |
+| Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                        |
+| Siri       | Swift App Intents compiled into the app target via Expo inline modules               |
+| iOS builds | Unsigned IPA built on a GitHub-hosted Mac, installed with Sideloadly — no Mac needed |
 
 ## Architecture
 
@@ -99,10 +103,16 @@ months of realistic expenses and budgets so the charts have something to show.
 | `npm run format`    | Format with Prettier                                     |
 | `npm run check`     | Type-check, lint, check formatting and test — same as CI |
 
+## Installing on an iPhone
+
+Siri needs a real build rather than Expo Go. [docs/install-on-iphone.md](docs/install-on-iphone.md)
+builds one on a GitHub-hosted Mac and installs it with a free Apple ID through Sideloadly.
+
 ## Roadmap
 
-- [ ] **Siri** — "Hey Siri, add £285 to my Groceries list in Expenses" in one sentence, using
-      App Intents with the iOS 27 Reminders schema, plus a classic App Shortcut fallback.
+- [x] **Siri** — "Hey Siri, log groceries in Expenses" → "How much?" → "285".
+- [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
+      iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).
 - [ ] **Action Button and Back Tap** — one press, say "285 groceries", done.
 - [ ] Shortcuts deep link: `expenses://expense/new?text=285%20groceries` already pre-fills the
       form.

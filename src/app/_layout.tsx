@@ -18,6 +18,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { migrate } from '@/db/migrate';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { SiriInboxSync } from '@/siri/siri-inbox-sync';
 import { DataVersionProvider } from '@/state/data-version';
 import { SelectedMonthProvider } from '@/state/selected-month';
 
@@ -47,6 +48,7 @@ export default function RootLayout() {
         <DataVersionProvider>
           <SelectedMonthProvider>
             <HideSplashScreen />
+            <SiriInboxSync />
             <Stack
               screenOptions={{
                 headerTintColor: colors.tint,

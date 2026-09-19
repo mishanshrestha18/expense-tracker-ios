@@ -8,7 +8,8 @@
     "scheme": "expenses",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nicklane123.expenses"
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +42,10 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "inlineModules": {
+        "watchedDirectories": ["native"]
+      }
     },
     "description": "Personal expense tracker with quick natural-language entry, monthly budgets and insights."
   }
