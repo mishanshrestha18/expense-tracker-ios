@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Design tokens for light and dark mode. Values follow iOS conventions
+ * (grouped backgrounds, card surfaces) with an emerald brand tint.
  */
 
 import '@/global.css';
@@ -10,21 +10,38 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    textSecondary: '#6E6E73',
+    textTertiary: '#A1A1A6',
+    background: '#F2F2F7',
+    card: '#FFFFFF',
+    backgroundElement: '#E9E9EE',
+    backgroundSelected: '#DCDCE1',
+    separator: '#E3E3E8',
+    tint: '#047857',
+    tintSoft: '#D1FAE5',
+    onTint: '#FFFFFF',
+    warning: '#B54708',
+    danger: '#D92D20',
   },
   dark: {
-    text: '#ffffff',
+    text: '#FFFFFF',
+    textSecondary: '#98989F',
+    textTertiary: '#636366',
     background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    card: '#1C1C1E',
+    backgroundElement: '#2C2C2E',
+    backgroundSelected: '#3A3A3C',
+    separator: '#38383A',
+    tint: '#34D399',
+    tintSoft: '#0B3B2C',
+    onTint: '#04241A',
+    warning: '#FFB340',
+    danger: '#FF6961',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type Theme = { [K in ThemeColor]: string };
 
 export const Fonts = Platform.select({
   ios: {
@@ -61,5 +78,14 @@ export const Spacing = {
   six: 64,
 } as const;
 
+export const Radius = {
+  control: 12,
+  card: 18,
+  pill: 999,
+} as const;
+
+/** Space the floating tab bar covers at the bottom of each tab screen. */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+/** Space the web tab bar covers at the top of each tab screen. */
+export const TopTabInset = Platform.select({ web: 88 }) ?? 0;
+export const MaxContentWidth = 720;
