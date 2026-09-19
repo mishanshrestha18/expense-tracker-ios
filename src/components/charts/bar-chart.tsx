@@ -20,21 +20,31 @@ interface BarChartProps {
   /** Describes the chart for VoiceOver. */
   accessibilityLabel: string;
   height?: number;
+  /** A dashed horizontal line, e.g. the monthly budget. */
+  reference?: { value: number; label: string };
 }
 
 const AXIS_WIDTH = 44;
 const LABEL_HEIGHT = 16;
+const REFERENCE_DASH = '6 4';
 
-export function BarChart({ data, formatValue, accessibilityLabel, height = 150 }: BarChartProps) {
+export function BarChart({
+  data,
+  formatValue,
+  accessibilityLabel,
+  height = 150,
+  reference,
+}: BarChartProps) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
-  const axisMax = niceCeiling(Math.max(0, ...data.map((d) => d.value)));
+  const axisMax = niceCeiling(Math.max(0, reference?.value ?? 0, ...data.map((d) => d.value)));
   const bars = barLayout(
     data.map((d) => d.value),
     width,
     height,
     { maxValue: axisMax, gapRatio: 0.38 },
   );
+  const referenceY = reference ? height - (reference.value / axisMax) * height : null;
 
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
@@ -79,6 +89,17 @@ export function BarChart({ data, formatValue, accessibilityLabel, height = 150 }
                   />
                 );
               })}
+              {referenceY !== null ? (
+                <Line
+                  x1={0}
+                  x2={width}
+                  y1={referenceY}
+                  y2={referenceY}
+                  stroke={theme.warning}
+                  strokeWidth={1.5}
+                  strokeDasharray={REFERENCE_DASH}
+                />
+              ) : null}
             </Svg>
           ) : null}
         </View>
@@ -108,6 +129,24 @@ export function BarChart({ data, formatValue, accessibilityLabel, height = 150 }
           </ThemedText>
         ))}
       </View>
+      {reference ? (
+        <View style={styles.legend}>
+          <Svg width={22} height={4}>
+            <Line
+              x1={0}
+              x2={22}
+              y1={2}
+              y2={2}
+              stroke={theme.warning}
+              strokeWidth={1.5}
+              strokeDasharray={REFERENCE_DASH}
+            />
+          </Svg>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {reference.label}
+          </ThemedText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -136,5 +175,11 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
     textAlign: 'center',
+  },
+  legend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.three,
   },
 });

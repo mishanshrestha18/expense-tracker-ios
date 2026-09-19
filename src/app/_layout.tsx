@@ -70,10 +70,18 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
-                name="budget/[categoryId]"
+                name="budget/monthly"
                 options={{
                   presentation: 'modal',
                   title: 'Monthly budget',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
+                name="budget/[categoryId]"
+                options={{
+                  presentation: 'modal',
+                  title: 'Category budget',
                   headerLeft: HeaderCancelButton,
                 }}
               />

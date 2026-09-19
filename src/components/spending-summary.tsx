@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
-import type { BudgetProgress } from '@/domain/budget';
+import type { BudgetBasis, BudgetProgress } from '@/domain/budget';
 import { currentMonthKey, formatMonthName, type MonthKey } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
 import { useTheme } from '@/hooks/use-theme';
@@ -13,10 +13,11 @@ interface SpendingSummaryProps {
   month: MonthKey;
   totalPence: number;
   expenseCount: number;
-  /** Progress of budgeted categories against their combined limit. */
+  /** Headline budget progress; see `budgetOverview`. */
   budget: BudgetProgress;
+  budgetBasis: BudgetBasis;
   dailyAllowancePence: number | null;
-  onSetBudgets: () => void;
+  onSetBudget: () => void;
 }
 
 export function SpendingSummary({
@@ -24,8 +25,9 @@ export function SpendingSummary({
   totalPence,
   expenseCount,
   budget,
+  budgetBasis,
   dailyAllowancePence,
-  onSetBudgets,
+  onSetBudget,
 }: SpendingSummaryProps) {
   const theme = useTheme();
   const label =
@@ -52,9 +54,7 @@ export function SpendingSummary({
             <ThemedText
               type="footnote"
               style={{ color: budget.status === 'over' ? theme.danger : theme.textSecondary }}>
-              {budget.remainingPence >= 0
-                ? `${formatPence(budget.remainingPence)} left of ${formatPence(budget.limitPence)} budgeted`
-                : `${formatPence(-budget.remainingPence)} over your ${formatPence(budget.limitPence)} budget`}
+              {budgetText(budget.remainingPence, budget.limitPence, budgetBasis)}
             </ThemedText>
             {dailyAllowancePence !== null ? (
               <ThemedText type="footnote" themeColor="textSecondary">
@@ -64,12 +64,24 @@ export function SpendingSummary({
           </View>
         </View>
       ) : (
-        <Pressable accessibilityRole="link" onPress={onSetBudgets} hitSlop={8}>
-          <ThemedText type="linkPrimary">Set monthly budgets →</ThemedText>
+        <Pressable accessibilityRole="link" onPress={onSetBudget} hitSlop={8}>
+          <ThemedText type="linkPrimary">Set a monthly budget →</ThemedText>
         </Pressable>
       )}
     </Card>
   );
+}
+
+function budgetText(remainingPence: number, limitPence: number, basis: BudgetBasis): string {
+  const limit = formatPence(limitPence);
+  if (basis === 'monthly') {
+    return remainingPence >= 0
+      ? `${formatPence(remainingPence)} left of your ${limit} monthly budget`
+      : `${formatPence(-remainingPence)} over your ${limit} monthly budget`;
+  }
+  return remainingPence >= 0
+    ? `${formatPence(remainingPence)} left of ${limit} budgeted`
+    : `${formatPence(-remainingPence)} over your ${limit} budget`;
 }
 
 const styles = StyleSheet.create({

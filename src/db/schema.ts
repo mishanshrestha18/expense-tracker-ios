@@ -160,4 +160,12 @@ export const MIGRATIONS: readonly string[] = [
 
   ${seedCategories}
   `,
+
+  // v2: one overall monthly budget across all categories (a single-row table).
+  `
+  CREATE TABLE overall_budget (
+    id                  INTEGER PRIMARY KEY CHECK (id = 1),
+    monthly_limit_pence INTEGER NOT NULL CHECK (monthly_limit_pence > 0)
+  );
+  `,
 ];

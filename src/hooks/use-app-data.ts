@@ -1,5 +1,5 @@
 /** Typed data hooks for screens. Each wraps one repository call. */
-import { listBudgets } from '@/db/budgets';
+import { getOverallBudget, listBudgets } from '@/db/budgets';
 import { listCategories } from '@/db/categories';
 import {
   getExpense,
@@ -30,6 +30,11 @@ export function useMonthSpending(month: MonthKey) {
 
 export function useBudgets() {
   return useDbQuery('budgets', listBudgets);
+}
+
+/** The overall monthly budget in pence; `data` is `null` when none is set. */
+export function useOverallBudget() {
+  return useDbQuery('overall-budget', getOverallBudget);
 }
 
 export function useMonthlyTotals(first: MonthKey, last: MonthKey) {

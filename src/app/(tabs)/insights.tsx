@@ -23,6 +23,7 @@ import {
   useCategories,
   useMonthlyTotals,
   useMonthSpending,
+  useOverallBudget,
   useTotalBetween,
 } from '@/hooks/use-app-data';
 import { useTheme } from '@/hooks/use-theme';
@@ -37,6 +38,7 @@ export default function InsightsScreen() {
   const spending = useMonthSpending(month).data ?? [];
   const months = monthsEndingAt(month, TREND_MONTHS);
   const totals = fillMonths(months, useMonthlyTotals(months[0], month).data ?? []);
+  const overallBudget = useOverallBudget().data ?? null;
 
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const slices = breakdown(
@@ -161,6 +163,14 @@ export default function InsightsScreen() {
               highlighted: t.month === month,
             }))}
             formatValue={formatPenceCompact}
+            reference={
+              overallBudget !== null
+                ? {
+                    value: overallBudget,
+                    label: `Monthly budget ${formatPenceShort(overallBudget)}`,
+                  }
+                : undefined
+            }
             accessibilityLabel={`Monthly spending: ${totals
               .map((t) => `${formatMonthName(t.month)} ${formatPence(t.totalPence)}`)
               .join(', ')}`}

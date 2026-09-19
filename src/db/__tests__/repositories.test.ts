@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
 import { createTestDb } from '@/test-utils/sqljs-db';
 
-import { listBudgets, removeBudget, setBudget } from '../budgets';
+import {
+  getOverallBudget,
+  listBudgets,
+  removeBudget,
+  removeOverallBudget,
+  setBudget,
+  setOverallBudget,
+} from '../budgets';
 import { listCategories } from '../categories';
 import { clearAllData, loadDemoData } from '../demo-data';
 import {
@@ -34,6 +41,22 @@ describe('migrations', () => {
     const categories = await listCategories(db);
     expect(categories.map((c) => c.name)).toEqual(DEFAULT_CATEGORIES.map((c) => c.name));
     expect(categories[0].aliases).toContain('tesco');
+  });
+
+  it('upgrades an existing v1 database without losing data', async () => {
+    const legacy = await createTestDb({ migrated: false });
+    await legacy.execAsync(MIGRATIONS[0]);
+    await legacy.execAsync('PRAGMA user_version = 1');
+    await addExpense(legacy, { amountPence: 1234, categoryId: 1, note: '', spentOn: '2026-09-01' });
+    await setBudget(legacy, 1, 45000);
+
+    await migrate(legacy);
+
+    expect(await listExpensesInMonth(legacy, '2026-09')).toHaveLength(1);
+    expect(await listBudgets(legacy)).toEqual([{ categoryId: 1, monthlyLimitPence: 45000 }]);
+    await setOverallBudget(legacy, 150000);
+    expect(await getOverallBudget(legacy)).toBe(150000);
+    legacy.close();
   });
 
   it('records the schema version and is safe to run again', async () => {
@@ -132,6 +155,24 @@ describe('budgets', () => {
     await removeBudget(db, 1);
     expect(await listBudgets(db)).toEqual([{ categoryId: 2, monthlyLimitPence: 20000 }]);
   });
+
+  it('keeps a single overall monthly budget', async () => {
+    expect(await getOverallBudget(db)).toBeNull();
+
+    await setOverallBudget(db, 150000);
+    await setOverallBudget(db, 160000);
+    expect(await getOverallBudget(db)).toBe(160000);
+    const row = await db.getFirstAsync<{ rows: number }>(
+      'SELECT COUNT(*) AS rows FROM overall_budget',
+      [],
+    );
+    expect(row?.rows).toBe(1);
+
+    await expect(setOverallBudget(db, 0)).rejects.toThrow();
+
+    await removeOverallBudget(db);
+    expect(await getOverallBudget(db)).toBeNull();
+  });
 });
 
 describe('demo data', () => {
@@ -143,6 +184,7 @@ describe('demo data', () => {
     const totals = await monthlyTotals(db, '2026-03', '2026-09');
     expect(totals.length).toBeGreaterThanOrEqual(6);
     expect(await listBudgets(db)).not.toHaveLength(0);
+    expect(await getOverallBudget(db)).toBe(160000);
 
     const other = await createTestDb();
     expect(await loadDemoData(other, today)).toBe(added);
@@ -151,6 +193,7 @@ describe('demo data', () => {
     await clearAllData(db);
     expect(await monthlyTotals(db, '2026-03', '2026-09')).toEqual([]);
     expect(await listBudgets(db)).toEqual([]);
+    expect(await getOverallBudget(db)).toBeNull();
     expect(await listCategories(db)).toHaveLength(DEFAULT_CATEGORIES.length);
   });
 });

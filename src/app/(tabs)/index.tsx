@@ -27,6 +27,7 @@ import {
   useCategories,
   useMonthExpenses,
   useMonthSpending,
+  useOverallBudget,
 } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
 import { useSelectedMonth } from '@/state/selected-month';
@@ -39,9 +40,10 @@ export default function OverviewScreen() {
   const expenses = useMonthExpenses(month).data ?? [];
   const spending = useMonthSpending(month).data ?? [];
   const budgets = useBudgets().data ?? [];
+  const overallBudget = useOverallBudget().data ?? null;
 
   const totalPence = spending.reduce((sum, s) => sum + s.totalPence, 0);
-  const { progress } = budgetOverview(spending, budgets);
+  const { progress, basis } = budgetOverview(spending, budgets, overallBudget);
   const allowance = dailyAllowancePence(progress.remainingPence, daysRemainingInMonth(month));
   const days = groupByDay(expenses);
 
@@ -72,8 +74,9 @@ export default function OverviewScreen() {
         totalPence={totalPence}
         expenseCount={expenses.length}
         budget={progress}
+        budgetBasis={basis}
         dailyAllowancePence={allowance}
-        onSetBudgets={() => router.navigate('/budgets')}
+        onSetBudget={() => router.push('/budget/monthly')}
       />
 
       <QuickAddBar categories={categories} onAdd={quickAdd} />

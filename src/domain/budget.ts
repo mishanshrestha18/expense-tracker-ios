@@ -47,19 +47,44 @@ export interface CategoryBudget {
   monthlyLimitPence: number;
 }
 
+/**
+ * What the headline budget figure measures:
+ * - `monthly`: all spending against the overall monthly budget
+ * - `categories`: spending in budgeted categories against their combined limits
+ * - `none`: no budgets at all
+ */
+export type BudgetBasis = 'monthly' | 'categories' | 'none';
+
 export interface BudgetOverview {
-  /** Sum of all category limits. `0` when no budgets are set. */
-  totalLimitPence: number;
-  /** Spending in categories that have a budget. */
+  /** Everything spent in the month, budgeted or not. */
+  totalSpentPence: number;
+  /** The overall monthly budget, or `null` when not set. */
+  monthlyLimitPence: number | null;
+  /** Sum of all category limits. `0` when none are set. */
+  categoryLimitsPence: number;
+  /** Spending in categories that have their own budget. */
   budgetedSpentPence: number;
-  /** Spending in categories without a budget. */
+  /** Spending in categories without their own budget. */
   unbudgetedSpentPence: number;
+  basis: BudgetBasis;
+  /** The headline figure, measured against `basis`. */
   progress: BudgetProgress;
+  /**
+   * Monthly budget left after category limits; negative when the categories add
+   * up to more than the monthly budget. `null` without a monthly budget.
+   */
+  unallocatedPence: number | null;
 }
 
+/**
+ * Combines the overall monthly budget with per-category limits. The monthly
+ * budget, when set, is the headline because it covers every category; category
+ * limits are then sub-budgets within it.
+ */
 export function budgetOverview(
   spending: readonly CategorySpend[],
   budgets: readonly CategoryBudget[],
+  monthlyLimitPence: number | null = null,
 ): BudgetOverview {
   const limits = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
   let budgetedSpentPence = 0;
@@ -68,11 +93,27 @@ export function budgetOverview(
     if (limits.has(categoryId)) budgetedSpentPence += totalPence;
     else unbudgetedSpentPence += totalPence;
   }
-  const totalLimitPence = budgets.reduce((sum, b) => sum + b.monthlyLimitPence, 0);
+  const totalSpentPence = budgetedSpentPence + unbudgetedSpentPence;
+  const categoryLimitsPence = budgets.reduce((sum, b) => sum + b.monthlyLimitPence, 0);
+  const monthly = monthlyLimitPence !== null && monthlyLimitPence > 0 ? monthlyLimitPence : null;
+
+  const basis: BudgetBasis =
+    monthly !== null ? 'monthly' : categoryLimitsPence > 0 ? 'categories' : 'none';
+  const progress =
+    basis === 'monthly'
+      ? budgetProgress(totalSpentPence, monthly)
+      : basis === 'categories'
+        ? budgetProgress(budgetedSpentPence, categoryLimitsPence)
+        : budgetProgress(totalSpentPence, null);
+
   return {
-    totalLimitPence,
+    totalSpentPence,
+    monthlyLimitPence: monthly,
+    categoryLimitsPence,
     budgetedSpentPence,
     unbudgetedSpentPence,
-    progress: budgetProgress(budgetedSpentPence, totalLimitPence > 0 ? totalLimitPence : null),
+    basis,
+    progress,
+    unallocatedPence: monthly === null ? null : monthly - categoryLimitsPence,
   };
 }

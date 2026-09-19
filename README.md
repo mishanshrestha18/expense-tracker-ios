@@ -11,10 +11,11 @@ Everything is stored on the device. No account, no server.
 - **Plain-English quick add** — type or dictate `285 groceries`, `spent 12 on lunch with Sam` or
   `50p sweets`. Amount, category, note and date are parsed on-device with a live preview before
   saving.
-- **Monthly budgets** — a limit per category, with a warning at 80%, an over-budget state and a
-  "£X per day to stay on track" allowance.
-- **Insights** — spending by category (donut chart), change versus last month, monthly average and
-  a six-month trend (bar chart).
+- **Budgets** — one overall monthly budget, a limit per category, or both. Warnings at 80%, an
+  over-budget state, a "£X per day to stay on track" allowance, and a check that the category
+  limits fit inside the monthly budget.
+- **Insights** — spending by category (donut chart), change versus the same point last month,
+  monthly average and a six-month trend with the monthly budget marked (bar chart).
 - **Native feel** — iOS tab bar (Liquid Glass on iOS 26+), modal sheets, the native date picker,
   haptics, light and dark mode, and VoiceOver labels throughout.
 - **Offline-first** — SQLite on the device with versioned schema migrations.

@@ -5,9 +5,12 @@
  */
 import { addDays, toIsoDate } from '@/domain/dates';
 
-import { setBudget } from './budgets';
+import { setBudget, setOverallBudget } from './budgets';
 import { listCategories } from './categories';
 import type { Db } from './types';
+
+/** Leaves room above the category budgets (which total £1,210) for unbudgeted spending. */
+const DEMO_MONTHLY_BUDGET_POUNDS = 1600;
 
 interface Pattern {
   perMonth: [min: number, max: number];
@@ -103,6 +106,7 @@ export async function loadDemoData(db: Db, today: Date = new Date(), months = 6)
         await setBudget(db, category.id, pattern.budgetPounds * 100);
       }
     }
+    await setOverallBudget(db, DEMO_MONTHLY_BUDGET_POUNDS * 100);
   });
 
   return added;
@@ -111,6 +115,6 @@ export async function loadDemoData(db: Db, today: Date = new Date(), months = 6)
 /** Deletes every expense and budget. Categories are kept. */
 export async function clearAllData(db: Db): Promise<void> {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM expenses; DELETE FROM budgets;');
+    await db.execAsync('DELETE FROM expenses; DELETE FROM budgets; DELETE FROM overall_budget;');
   });
 }
