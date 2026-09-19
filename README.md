@@ -1,56 +1,109 @@
-# Welcome to your Expo app 👋
+# Expenses
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A personal expense tracker for iPhone, built with **Expo (React Native) and TypeScript**.
+Log spending the way you would say it — _"285 groceries"_, _"£4.20 coffee yesterday"_ — set
+monthly budgets per category, and see where your money goes.
 
-## Get started
+Everything is stored on the device. No account, no server.
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+- **Plain-English quick add** — type or dictate `285 groceries`, `spent 12 on lunch with Sam` or
+  `50p sweets`. Amount, category, note and date are parsed on-device with a live preview before
+  saving.
+- **Monthly budgets** — a limit per category, with a warning at 80%, an over-budget state and a
+  "£X per day to stay on track" allowance.
+- **Insights** — spending by category (donut chart), change versus last month, monthly average and
+  a six-month trend (bar chart).
+- **Native feel** — iOS tab bar (Liquid Glass on iOS 26+), modal sheets, the native date picker,
+  haptics, light and dark mode, and VoiceOver labels throughout.
+- **Offline-first** — SQLite on the device with versioned schema migrations.
 
-2. Start the app
+## Tech stack
 
-   ```bash
-   npx expo start
-   ```
+| Area       | Choice                                                                              |
+| ---------- | ----------------------------------------------------------------------------------- |
+| App        | Expo SDK 57, React Native 0.86, React 19.2 with the React Compiler                  |
+| Language   | TypeScript 6 in strict mode                                                         |
+| Navigation | Expo Router (file-based), native tabs and modal screens                             |
+| Storage    | `expo-sqlite` with versioned migrations; money stored as integer pence              |
+| Charts     | Hand-rolled SVG with `react-native-svg`; the geometry is unit tested                |
+| Testing    | Jest (`jest-expo`) + `sql.js`, so repository tests run against a real SQLite engine |
+| Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                       |
 
-In the output, you'll find options to open the app in a
+## Architecture
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```mermaid
+flowchart LR
+  subgraph UI
+    Routes["app/ (Expo Router screens)"] --> Components["components/"]
+  end
+  Routes --> Hooks["hooks/ — useDbQuery + typed data hooks"]
+  Hooks --> Repos["db/ — repositories + migrations"]
+  Repos --> Db[("Db interface")]
+  Db --> ExpoSQLite["expo-sqlite (device)"]
+  Db --> SqlJs["sql.js (tests)"]
+  Routes --> Domain["domain/ — pure logic"]
+  Hooks -. "writes bump a data version" .-> Routes
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+```
+src/
+├── app/          Screens and navigation (Expo Router)
+├── components/   UI components; ui/ holds the design-system primitives
+├── domain/       Pure business logic: money, dates, quick-add parser, budgets, chart geometry
+├── db/           Schema, migrations and repositories
+├── hooks/        Data hooks built on useDbQuery / useDbMutation
+├── state/        App-wide context: selected month, data version
+└── test-utils/   In-memory SQLite for tests
+```
 
-### Other setup steps
+Key decisions:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- **Money is integer pence.** `0.1 + 0.2 !== 0.3` in floating point; pence never drift.
+  Formatting to `£285.50` happens only at the edges.
+- **Expenses store a local calendar date** (`2026-09-19`), not a timestamp, so monthly totals
+  never shift with time zones or daylight saving.
+- **Repositories depend on a small `Db` interface**, not on `expo-sqlite` directly. The
+  same SQL runs on the phone and against an in-memory `sql.js` database in Jest.
+- **The quick-add parser is pure and exhaustively tested**, because it will also back Siri and
+  Shortcuts (see the roadmap).
+- **No state library.** Reads go through `useDbQuery`; every write bumps a version in context,
+  and queries re-run. It is small, explicit and enough for a single-user, on-device app.
 
-## Learn more
+## Getting started
 
-To learn more about developing your project with Expo, look at the following resources:
+You need Node.js 22+ and the free **Expo Go** app on your iPhone. No Mac is required.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm install
+npm start
+```
 
-## Join the community
+Scan the QR code with the iPhone Camera app to open the project in Expo Go. The phone and the
+computer must be on the same Wi-Fi network; if they cannot see each other, run
+`npx expo start --tunnel` instead.
 
-Join our community of developers creating universal apps.
+In development builds, the empty Overview screen offers **Load sample data**, which fills six
+months of realistic expenses and budgets so the charts have something to show.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Scripts
+
+| Command             | What it does                                             |
+| ------------------- | -------------------------------------------------------- |
+| `npm start`         | Start the dev server (open in Expo Go)                   |
+| `npm test`          | Run the Jest suite                                       |
+| `npm run typecheck` | Type-check with `tsc`                                    |
+| `npm run lint`      | Lint with ESLint                                         |
+| `npm run format`    | Format with Prettier                                     |
+| `npm run check`     | Type-check, lint, check formatting and test — same as CI |
+
+## Roadmap
+
+- [ ] **Siri** — "Hey Siri, add £285 to my Groceries list in Expenses" in one sentence, using
+      App Intents with the iOS 27 Reminders schema, plus a classic App Shortcut fallback.
+- [ ] **Action Button and Back Tap** — one press, say "285 groceries", done.
+- [ ] Shortcuts deep link: `expenses://expense/new?text=285%20groceries` already pre-fills the
+      form.
+- [ ] Custom categories, CSV export and receipt photos.
+- [ ] TestFlight release.
