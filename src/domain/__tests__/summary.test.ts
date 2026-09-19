@@ -1,28 +1,46 @@
 import { describe, expect, it } from '@jest/globals';
 
+import { CALENDAR_MONTHS, periodFor, periodsEndingAt } from '../period';
 import {
   averageOfActiveMonths,
   breakdown,
-  fillMonths,
+  bucketByPeriod,
   groupByDay,
   percentChange,
 } from '../summary';
 
-describe('fillMonths', () => {
-  it('fills gaps with zero and keeps the requested order', () => {
+describe('bucketByPeriod', () => {
+  it('sums days into each period and keeps the order', () => {
+    const periods = periodsEndingAt('2026-09', 3, CALENDAR_MONTHS);
     expect(
-      fillMonths(
-        ['2026-07', '2026-08', '2026-09'],
+      bucketByPeriod(
         [
-          { month: '2026-09', totalPence: 300 },
-          { month: '2026-07', totalPence: 100 },
+          { day: '2026-07-04', totalPence: 100 },
+          { day: '2026-09-01', totalPence: 200 },
+          { day: '2026-09-30', totalPence: 100 },
         ],
+        periods,
       ),
     ).toEqual([
       { month: '2026-07', totalPence: 100 },
       { month: '2026-08', totalPence: 0 },
       { month: '2026-09', totalPence: 300 },
     ]);
+  });
+
+  it('follows payday periods rather than calendar months', () => {
+    const period = periodFor('2026-08', { kind: 'day', day: 25, weekendAdjust: false });
+    expect(
+      bucketByPeriod(
+        [
+          { day: '2026-08-24', totalPence: 500 },
+          { day: '2026-08-25', totalPence: 100 },
+          { day: '2026-09-24', totalPence: 200 },
+          { day: '2026-09-25', totalPence: 900 },
+        ],
+        [period],
+      ),
+    ).toEqual([{ month: '2026-08', totalPence: 300 }]);
   });
 });
 

@@ -14,11 +14,12 @@ import { listCategories } from '../categories';
 import { clearAllData, loadDemoData } from '../demo-data';
 import {
   addExpense,
+  dailyTotals,
   deleteExpense,
   getExpense,
-  listExpensesInMonth,
-  monthlyTotals,
-  spendingByCategory,
+  listExpensesBetween,
+  paidWithTotals,
+  spendingByCategoryBetween,
   totalBetween,
   updateExpense,
 } from '../expenses';
@@ -47,12 +48,16 @@ describe('migrations', () => {
     const legacy = await createTestDb({ migrated: false });
     await legacy.execAsync(MIGRATIONS[0]);
     await legacy.execAsync('PRAGMA user_version = 1');
-    await addExpense(legacy, { amountPence: 1234, categoryId: 1, note: '', spentOn: '2026-09-01' });
+    // The v1 schema has no paid_with column, so insert the way v1 did.
+    await legacy.runAsync(
+      'INSERT INTO expenses (amount_pence, category_id, note, spent_on) VALUES (?, ?, ?, ?)',
+      [1234, 1, '', '2026-09-01'],
+    );
     await setBudget(legacy, 1, 45000);
 
     await migrate(legacy);
 
-    expect(await listExpensesInMonth(legacy, '2026-09')).toHaveLength(1);
+    expect(await listExpensesBetween(legacy, '2026-09-01', '2026-10-01')).toHaveLength(1);
     expect(await listBudgets(legacy)).toEqual([{ categoryId: 1, monthlyLimitPence: 45000 }]);
     await setOverallBudget(legacy, 150000);
     expect(await getOverallBudget(legacy)).toBe(150000);
@@ -108,7 +113,7 @@ describe('expenses', () => {
     ).rejects.toThrow();
   });
 
-  it('lists a month newest first and aggregates spending', async () => {
+  it('lists a date range newest first and aggregates spending', async () => {
     const add = (amountPence: number, categoryId: number, spentOn: string) =>
       addExpense(db, { amountPence, categoryId, note: '', spentOn });
     await add(1000, 1, '2026-08-31');
@@ -117,10 +122,10 @@ describe('expenses', () => {
     await add(700, 1, '2026-09-30');
     await add(9900, 3, '2026-10-01');
 
-    const september = await listExpensesInMonth(db, '2026-09');
+    const september = await listExpensesBetween(db, '2026-09-01', '2026-10-01');
     expect(september.map((e) => e.spentOn)).toEqual(['2026-09-30', '2026-09-15', '2026-09-01']);
 
-    const byCategory = await spendingByCategory(db, '2026-09');
+    const byCategory = await spendingByCategoryBetween(db, '2026-09-01', '2026-10-01');
     expect(byCategory).toEqual(
       expect.arrayContaining([
         { categoryId: 1, totalPence: 2700 },
@@ -129,10 +134,16 @@ describe('expenses', () => {
     );
     expect(byCategory).toHaveLength(2);
 
-    expect(await monthlyTotals(db, '2026-08', '2026-10')).toEqual([
-      { month: '2026-08', totalPence: 1000 },
-      { month: '2026-09', totalPence: 3200 },
-      { month: '2026-10', totalPence: 9900 },
+    expect(await dailyTotals(db, '2026-08-01', '2026-10-02')).toEqual([
+      { day: '2026-08-31', totalPence: 1000 },
+      { day: '2026-09-01', totalPence: 2000 },
+      { day: '2026-09-15', totalPence: 500 },
+      { day: '2026-09-30', totalPence: 700 },
+      { day: '2026-10-01', totalPence: 9900 },
+    ]);
+
+    expect(await paidWithTotals(db, '2026-09-01', '2026-10-01')).toEqual([
+      { paidWith: '', totalPence: 3200 },
     ]);
 
     expect(await totalBetween(db, '2026-09-01', '2026-09-16')).toBe(2500);
@@ -181,8 +192,8 @@ describe('demo data', () => {
     const added = await loadDemoData(db, today);
     expect(added).toBeGreaterThan(50);
 
-    const totals = await monthlyTotals(db, '2026-03', '2026-09');
-    expect(totals.length).toBeGreaterThanOrEqual(6);
+    const totals = await dailyTotals(db, '2026-03-01', '2026-10-01');
+    expect(totals.length).toBeGreaterThan(50);
     expect(await listBudgets(db)).not.toHaveLength(0);
     expect(await getOverallBudget(db)).toBe(160000);
 
@@ -191,7 +202,7 @@ describe('demo data', () => {
     other.close();
 
     await clearAllData(db);
-    expect(await monthlyTotals(db, '2026-03', '2026-09')).toEqual([]);
+    expect(await dailyTotals(db, '2026-03-01', '2026-10-01')).toEqual([]);
     expect(await listBudgets(db)).toEqual([]);
     expect(await getOverallBudget(db)).toBeNull();
     expect(await listCategories(db)).toHaveLength(DEFAULT_CATEGORIES.length);

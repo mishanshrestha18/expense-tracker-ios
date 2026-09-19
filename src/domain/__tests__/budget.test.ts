@@ -6,7 +6,11 @@ import {
   budgetProgress,
   type BudgetStatus,
   dailyAllowancePence,
+  safeToSpendPence,
 } from '../budget';
+import { CALENDAR_MONTHS, periodFor } from '../period';
+
+const month = (key: string) => periodFor(key, CALENDAR_MONTHS);
 
 describe('budgetPace', () => {
   // 19 September: 19 of 30 days gone.
@@ -14,39 +18,41 @@ describe('budgetPace', () => {
   const limit = 160000;
 
   it('is on track at or near a straight-line pace', () => {
-    const pace = budgetPace(89727, limit, '2026-09', today);
+    const pace = budgetPace(89727, limit, month('2026-09'), today);
     expect(pace.status).toBe('on-track');
-    expect(pace.monthElapsed).toBeCloseTo(19 / 30);
+    expect(pace.elapsed).toBeCloseTo(19 / 30);
     // Expected by now ≈ £1,013; the 10% cushion allows up to ≈ £1,173.
-    expect(budgetPace(117000, limit, '2026-09', today).status).toBe('on-track');
+    expect(budgetPace(117000, limit, month('2026-09'), today).status).toBe('on-track');
   });
 
   it('flags spending well ahead of pace', () => {
-    expect(budgetPace(120000, limit, '2026-09', today).status).toBe('fast');
+    expect(budgetPace(120000, limit, month('2026-09'), today).status).toBe('fast');
   });
 
   it('reports going over the limit', () => {
-    expect(budgetPace(170000, limit, '2026-09', today).status).toBe('over');
-    expect(budgetPace(170000, limit, '2026-08', today)).toEqual({
+    expect(budgetPace(170000, limit, month('2026-09'), today).status).toBe('over');
+    expect(budgetPace(170000, limit, month('2026-08'), today)).toEqual({
       status: 'over',
-      monthElapsed: null,
+      elapsed: null,
     });
   });
 
   it('judges finished months against the whole limit', () => {
-    expect(budgetPace(150000, limit, '2026-08', today)).toEqual({
+    expect(budgetPace(150000, limit, month('2026-08'), today)).toEqual({
       status: 'under',
-      monthElapsed: null,
+      elapsed: null,
     });
   });
 
   it('treats future months as upcoming', () => {
-    expect(budgetPace(0, limit, '2026-10', today).status).toBe('upcoming');
+    expect(budgetPace(0, limit, month('2026-10'), today).status).toBe('upcoming');
   });
 
   it('does not panic over one early bill', () => {
     // £150 on the 1st of a £1,600 month is within the cushion.
-    expect(budgetPace(15000, limit, '2026-09', new Date(2026, 8, 1)).status).toBe('on-track');
+    expect(budgetPace(15000, limit, month('2026-09'), new Date(2026, 8, 1)).status).toBe(
+      'on-track',
+    );
   });
 });
 
@@ -142,5 +148,12 @@ describe('budgetOverview', () => {
     const overview = budgetOverview(spending, []);
     expect(overview.basis).toBe('none');
     expect(overview.progress).toMatchObject({ status: 'none', spentPence: 37500 });
+  });
+});
+
+describe('safeToSpendPence', () => {
+  it('sets aside the fees still to come out', () => {
+    expect(safeToSpendPence(50000, 12000)).toBe(38000);
+    expect(safeToSpendPence(null, 12000)).toBeNull();
   });
 });

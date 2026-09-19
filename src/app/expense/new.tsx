@@ -4,11 +4,11 @@ import { ExpenseForm } from '@/components/expense-form';
 import { FormScreen } from '@/components/ui/screen';
 import { addExpense } from '@/db/expenses';
 import type { ExpenseInput } from '@/db/types';
-import { monthKeyOf } from '@/domain/dates';
+import { periodKeyOf } from '@/domain/period';
 import { parseQuickAdd } from '@/domain/quick-add';
 import { useCategories } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useSelectedPeriod } from '@/state/period';
 
 /**
  * New expense form. Accepts an optional `text` param that is pre-filled via the
@@ -20,7 +20,7 @@ export default function NewExpenseScreen() {
   const { text } = useLocalSearchParams<{ text?: string }>();
   const { categories, loaded } = useCategories();
   const mutate = useDbMutation();
-  const { setMonth } = useSelectedMonth();
+  const { setMonth, rule } = useSelectedPeriod();
 
   if (!loaded) return <FormScreen />;
 
@@ -31,12 +31,13 @@ export default function NewExpenseScreen() {
         categoryId: parsed.categoryId ?? undefined,
         note: parsed.note,
         spentOn: parsed.spentOn,
+        paidWith: parsed.paidWith,
       }
     : undefined;
 
   async function save(input: ExpenseInput) {
     await mutate((db) => addExpense(db, input));
-    setMonth(monthKeyOf(input.spentOn));
+    setMonth(periodKeyOf(input.spentOn, rule));
     router.back();
   }
 

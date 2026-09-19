@@ -42,6 +42,11 @@ const MERCHANT_HINTS: Readonly<Record<string, readonly string[]>> = {
   Health: ['superdrug', 'puregym', 'gym group', 'specsavers'],
 };
 
+/** Every phrase that points at a category: its name, its aliases and the chains above. */
+export function matchPhrasesFor(category: CategoryMatcher): string[] {
+  return [category.name, ...category.aliases, ...(MERCHANT_HINTS[category.name] ?? [])];
+}
+
 /** The best category for a merchant, or `null` when nothing matches. */
 export function categoriseMerchant(
   merchant: string,

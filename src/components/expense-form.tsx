@@ -7,11 +7,13 @@ import { DateField } from '@/components/date-field';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
 import type { Category, ExpenseInput } from '@/db/types';
 import { toIsoDate } from '@/domain/dates';
 import { parseAmountToPence, penceToInputValue } from '@/domain/money';
+import { type PaidWith, paidWithLabel } from '@/domain/paid-with';
 import { useTheme } from '@/hooks/use-theme';
 
 interface ExpenseFormProps {
@@ -38,6 +40,7 @@ export function ExpenseForm({
   const [categoryId, setCategoryId] = useState<number | null>(initial?.categoryId ?? null);
   const [note, setNote] = useState(initial?.note ?? '');
   const [spentOn, setSpentOn] = useState(initial?.spentOn ?? toIsoDate(new Date()));
+  const [paidWith, setPaidWith] = useState<PaidWith>(initial?.paidWith ?? '');
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -50,7 +53,7 @@ export function ExpenseForm({
     if (amountPence === null || categoryId === null) return;
     setSaving(true);
     try {
-      await onSubmit({ amountPence, categoryId, note, spentOn });
+      await onSubmit({ amountPence, categoryId, note, spentOn, paidWith });
     } finally {
       setSaving(false);
     }
@@ -100,6 +103,20 @@ export function ExpenseForm({
         <DateField value={spentOn} onChange={setSpentOn} />
       </Section>
 
+      <Section title="Paid with" detail="Optional">
+        <View style={styles.chips}>
+          {(['cash', 'card', 'apple-pay'] as const).map((value) => (
+            <Chip
+              key={value}
+              label={paidWithLabel(value)}
+              selected={paidWith === value}
+              // Tapping the chosen one again clears it.
+              onPress={() => setPaidWith(paidWith === value ? '' : value)}
+            />
+          ))}
+        </View>
+      </Section>
+
       <View style={styles.actions}>
         <Button title={submitLabel} onPress={save} loading={saving} />
         {onDelete ? (
@@ -118,6 +135,11 @@ export function ExpenseForm({
 const styles = StyleSheet.create({
   form: {
     gap: Spacing.four,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
   amountCard: {
     alignItems: 'center',

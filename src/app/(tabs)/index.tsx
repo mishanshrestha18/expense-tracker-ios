@@ -13,44 +13,49 @@ import { Section } from '@/components/ui/section';
 import { loadDemoData } from '@/db/demo-data';
 import { addExpense } from '@/db/expenses';
 import type { ExpenseInput } from '@/db/types';
-import { budgetOverview, dailyAllowancePence } from '@/domain/budget';
-import {
-  daysRemainingInMonth,
-  formatDayHeading,
-  formatMonthName,
-  monthKeyOf,
-} from '@/domain/dates';
+import { budgetOverview, dailyAllowancePence, safeToSpendPence } from '@/domain/budget';
+import { formatDayHeading, formatMonthName } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
+import { paidWithSummary } from '@/domain/paid-with';
+import { daysRemainingInPeriod, formatPeriodRange, periodKeyOf, periodNoun } from '@/domain/period';
 import { groupByDay } from '@/domain/summary';
 import {
   useBudgets,
   useCategories,
-  useMonthExpenses,
-  useMonthSpending,
   useOverallBudget,
+  usePaidWithTotals,
+  usePeriodExpenses,
+  usePeriodSpending,
 } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useUpcomingFees } from '@/hooks/use-recurring';
+import { useSelectedPeriod } from '@/state/period';
 
 export default function OverviewScreen() {
   const router = useRouter();
   const mutate = useDbMutation();
-  const { month, setMonth } = useSelectedMonth();
+  const { month, setMonth, rule, period, isCurrent } = useSelectedPeriod();
   const { categories, byId } = useCategories();
-  const expenses = useMonthExpenses(month).data ?? [];
-  const spending = useMonthSpending(month).data ?? [];
+  const expenses = usePeriodExpenses(period).data ?? [];
+  const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
+  const paidWith = usePaidWithTotals(period).data ?? [];
+  const upcoming = useUpcomingFees(period);
 
   const totalPence = spending.reduce((sum, s) => sum + s.totalPence, 0);
   const { progress, basis } = budgetOverview(spending, budgets, overallBudget);
-  const allowance = dailyAllowancePence(progress.remainingPence, daysRemainingInMonth(month));
+  const allowance = dailyAllowancePence(
+    safeToSpendPence(progress.remainingPence, upcoming.totalPence),
+    daysRemainingInPeriod(period),
+  );
   const days = groupByDay(expenses);
+  const noun = periodNoun(rule);
 
   async function quickAdd(input: ExpenseInput) {
     await mutate((db) => addExpense(db, input));
-    // Jump to the month the expense landed in, e.g. "yesterday" on the 1st.
-    setMonth(monthKeyOf(input.spentOn));
+    // Jump to the period the expense landed in, e.g. "yesterday" on the 1st.
+    setMonth(periodKeyOf(input.spentOn, rule));
   }
 
   return (
@@ -58,24 +63,35 @@ export default function OverviewScreen() {
       <MonthSwitcher
         title="Overview"
         month={month}
+        subtitle={rule.kind === 'calendar' ? undefined : formatPeriodRange(period)}
+        isCurrent={isCurrent}
+        noun={noun}
         onChange={setMonth}
         accessory={
-          <IconButton
-            icon={{ ios: 'plus', material: 'add' }}
-            label="Add expense"
-            variant="filled"
-            onPress={() => router.push('/expense/new')}
-          />
+          <>
+            <IconButton
+              icon={{ ios: 'gearshape', material: 'settings' }}
+              label="Settings"
+              onPress={() => router.push('/settings')}
+            />
+            <IconButton
+              icon={{ ios: 'plus', material: 'add' }}
+              label="Add expense"
+              variant="filled"
+              onPress={() => router.push('/expense/new')}
+            />
+          </>
         }
       />
 
       <SpendingSummary
-        month={month}
+        label={isCurrent ? `Spent this ${noun}` : `Spent in ${formatMonthName(month)}`}
         totalPence={totalPence}
         expenseCount={expenses.length}
         budget={progress}
         budgetBasis={basis}
         dailyAllowancePence={allowance}
+        paidWithText={paidWithSummary(paidWith)}
         onSetBudget={() => router.push('/budget/monthly')}
       />
 

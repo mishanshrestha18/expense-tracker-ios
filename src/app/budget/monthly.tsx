@@ -7,20 +7,20 @@ import { FormScreen } from '@/components/ui/screen';
 import { removeOverallBudget, setOverallBudget } from '@/db/budgets';
 import { formatMonthName } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
-import { useBudgets, useMonthSpending, useOverallBudget } from '@/hooks/use-app-data';
+import { useBudgets, useOverallBudget, usePeriodSpending } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
 import { useTheme } from '@/hooks/use-theme';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useSelectedPeriod } from '@/state/period';
 
 /** The overall monthly budget: one limit covering every category. */
 export default function MonthlyBudgetScreen() {
   const theme = useTheme();
   const router = useRouter();
   const mutate = useDbMutation();
-  const { month } = useSelectedMonth();
+  const { month, period } = useSelectedPeriod();
   const monthlyLimitPence = useOverallBudget().data;
   const budgets = useBudgets().data;
-  const spending = useMonthSpending(month).data ?? [];
+  const spending = usePeriodSpending(period).data ?? [];
 
   if (monthlyLimitPence === undefined || budgets === undefined) return <FormScreen />;
 

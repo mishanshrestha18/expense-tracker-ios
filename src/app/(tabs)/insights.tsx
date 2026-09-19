@@ -10,35 +10,40 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
-import {
-  currentMonthKey,
-  formatMonthName,
-  formatMonthShort,
-  monthsEndingAt,
-  samePeriodLastMonth,
-} from '@/domain/dates';
+import { formatMonthName, formatMonthShort } from '@/domain/dates';
 import { formatPence, formatPenceCompact, formatPenceShort } from '@/domain/money';
-import { averageOfActiveMonths, breakdown, fillMonths, percentChange } from '@/domain/summary';
+import { paidWithSummary } from '@/domain/paid-with';
+import {
+  formatPeriodRange,
+  periodNoun,
+  periodsEndingAt,
+  samePointLastPeriod,
+} from '@/domain/period';
+import { averageOfActiveMonths, breakdown, bucketByPeriod, percentChange } from '@/domain/summary';
 import {
   useCategories,
-  useMonthlyTotals,
-  useMonthSpending,
+  useDailyTotals,
   useOverallBudget,
+  usePaidWithTotals,
+  usePeriodSpending,
   useTotalBetween,
 } from '@/hooks/use-app-data';
 import { useTheme } from '@/hooks/use-theme';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useSelectedPeriod } from '@/state/period';
 
-const TREND_MONTHS = 6;
+const TREND_PERIODS = 6;
 
 export default function InsightsScreen() {
   const theme = useTheme();
-  const { month, setMonth } = useSelectedMonth();
+  const { month, setMonth, rule, period, isCurrent } = useSelectedPeriod();
   const { categories } = useCategories();
-  const spending = useMonthSpending(month).data ?? [];
-  const months = monthsEndingAt(month, TREND_MONTHS);
-  const totals = fillMonths(months, useMonthlyTotals(months[0], month).data ?? []);
+  const spending = usePeriodSpending(period).data ?? [];
+  const periods = periodsEndingAt(month, TREND_PERIODS, rule);
+  const days = useDailyTotals(periods[0].start, period.end).data ?? [];
+  const totals = bucketByPeriod(days, periods);
   const overallBudget = useOverallBudget().data ?? null;
+  const paidWith = usePaidWithTotals(period).data ?? [];
+  const noun = periodNoun(rule);
 
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const slices = breakdown(
@@ -46,13 +51,13 @@ export default function InsightsScreen() {
   );
   const totalPence = slices.reduce((sum, s) => sum + s.totalPence, 0);
 
-  // Mid-month, compare with the same stretch of last month rather than all of it,
-  // otherwise the 3rd of the month always looks like a 90% drop.
-  const isCurrentMonth = month === currentMonthKey();
-  const lastMonthSoFar = samePeriodLastMonth();
-  const lastMonthSoFarPence = useTotalBetween(lastMonthSoFar.start, lastMonthSoFar.end).data ?? 0;
-  const previousPence = isCurrentMonth
-    ? lastMonthSoFarPence
+  // Part-way through, compare with the same stretch of the last period rather
+  // than all of it, otherwise day three always looks like a 90% drop.
+  const lastPeriodSoFar = samePointLastPeriod(month, rule);
+  const lastPeriodSoFarPence =
+    useTotalBetween(lastPeriodSoFar.start, lastPeriodSoFar.end).data ?? 0;
+  const previousPence = isCurrent
+    ? lastPeriodSoFarPence
     : (totals[totals.length - 2]?.totalPence ?? 0);
   const change = percentChange(totalPence, previousPence);
   const average = averageOfActiveMonths(totals);
@@ -60,7 +65,14 @@ export default function InsightsScreen() {
 
   return (
     <Screen>
-      <MonthSwitcher title="Insights" month={month} onChange={setMonth} />
+      <MonthSwitcher
+        title="Insights"
+        month={month}
+        subtitle={rule.kind === 'calendar' ? undefined : formatPeriodRange(period)}
+        isCurrent={isCurrent}
+        noun={noun}
+        onChange={setMonth}
+      />
 
       {totalPence === 0 ? (
         <EmptyState
@@ -109,7 +121,7 @@ export default function InsightsScreen() {
       <View style={styles.stats}>
         <Card style={styles.stat}>
           <ThemedText type="footnote" themeColor="textSecondary">
-            {isCurrentMonth ? 'vs this time last month' : 'vs previous month'}
+            {isCurrent ? `vs this time last ${noun}` : `vs previous ${noun}`}
           </ThemedText>
           {change === null ? (
             <ThemedText type="subtitle">—</ThemedText>
@@ -134,7 +146,7 @@ export default function InsightsScreen() {
         </Card>
         <Card style={styles.stat}>
           <ThemedText type="footnote" themeColor="textSecondary">
-            Monthly average
+            {`Average per ${noun}`}
           </ThemedText>
           <ThemedText type="subtitle" style={styles.tabular}>
             {formatPenceShort(average)}
@@ -150,10 +162,15 @@ export default function InsightsScreen() {
           <ThemedText type="headline">
             {top.item.name} · {Math.round(top.share * 100)}% of spending
           </ThemedText>
+          {paidWithSummary(paidWith) ? (
+            <ThemedText type="footnote" themeColor="textSecondary">
+              {`Paid with ${paidWithSummary(paidWith)}`}
+            </ThemedText>
+          ) : null}
         </Card>
       ) : null}
 
-      <Section title={`Last ${TREND_MONTHS} months`}>
+      <Section title={`Last ${TREND_PERIODS} ${noun}s`}>
         <Card>
           <BarChart
             data={totals.map((t) => ({
@@ -171,7 +188,7 @@ export default function InsightsScreen() {
                   }
                 : undefined
             }
-            accessibilityLabel={`Monthly spending: ${totals
+            accessibilityLabel={`Spending per ${noun}: ${totals
               .map((t) => `${formatMonthName(t.month)} ${formatPence(t.totalPence)}`)
               .join(', ')}`}
           />

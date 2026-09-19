@@ -2,7 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import type { Db } from '@/db/types';
 
-import { importInboxEntries, type InboxEntry, parseInboxEntry } from './inbox';
+import { importInboxEntries, type InboxItem, parseInboxEntry } from './inbox';
 
 /** Must match the folder written by native/LogExpenseIntent.swift. */
 const INBOX_DIRECTORY = 'siri-inbox';
@@ -21,7 +21,7 @@ export async function drainSiriInbox(db: Db): Promise<number> {
     .filter((item): item is File => item instanceof File && item.name.endsWith('.json'));
   if (files.length === 0) return 0;
 
-  const entries: InboxEntry[] = [];
+  const entries: InboxItem[] = [];
   for (const file of files) {
     const entry = parseInboxEntry(await file.text());
     if (entry) entries.push(entry);

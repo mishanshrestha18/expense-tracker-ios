@@ -1,4 +1,7 @@
 import type { IsoDate } from '@/domain/dates';
+import type { PaidWith } from '@/domain/paid-with';
+
+export type { PaidWith };
 
 export type SqlValue = string | number | null;
 
@@ -34,10 +37,13 @@ export interface Expense {
   categoryId: number;
   note: string;
   spentOn: IsoDate;
+  paidWith: PaidWith;
   createdAt: string;
 }
 
-export type ExpenseInput = Pick<Expense, 'amountPence' | 'categoryId' | 'note' | 'spentOn'>;
+export type ExpenseInput = Pick<Expense, 'amountPence' | 'categoryId' | 'note' | 'spentOn'> & {
+  paidWith?: PaidWith;
+};
 
 export interface Budget {
   categoryId: number;

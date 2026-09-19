@@ -45,7 +45,8 @@
         }
       ],
       "expo-sqlite",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/with-weak-frameworks"
     ],
     "experiments": {
       "typedRoutes": true,

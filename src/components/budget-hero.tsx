@@ -12,7 +12,7 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { type BudgetOverview, budgetPace, type PaceStatus } from '@/domain/budget';
-import { daysInMonth, daysRemainingInMonth, formatMonthName, type MonthKey } from '@/domain/dates';
+import { daysInPeriod, daysRemainingInPeriod, type Period } from '@/domain/period';
 import { formatPence, formatPenceShort } from '@/domain/money';
 
 const STATUS: Record<PaceStatus, { label: string; icon: IconName; tone: HeroTone }> = {
@@ -45,9 +45,13 @@ const STATUS: Record<PaceStatus, { label: string; icon: IconName; tone: HeroTone
 
 interface BudgetHeroProps {
   overview: BudgetOverview;
-  month: MonthKey;
-  /** Spend per day left to stay on budget, for the current month. */
+  period: Period;
+  /** Name of the period, e.g. "September", for the spoken summary. */
+  periodLabel: string;
+  /** Spend per day left to stay on budget, for the current period. */
   allowancePence: number | null;
+  /** Fees still expected this period, already taken off the allowance. */
+  upcomingPence?: number;
   onEditBudget: () => void;
 }
 
@@ -56,7 +60,14 @@ interface BudgetHeroProps {
  * (green on track, amber spending fast, red over), with a ring showing how
  * much of the budget is used.
  */
-export function BudgetHero({ overview, month, allowancePence, onEditBudget }: BudgetHeroProps) {
+export function BudgetHero({
+  overview,
+  period,
+  periodLabel,
+  allowancePence,
+  upcomingPence = 0,
+  onEditBudget,
+}: BudgetHeroProps) {
   const { progress, basis } = overview;
 
   if (basis === 'none' || progress.limitPence === null || progress.remainingPence === null) {
@@ -66,12 +77,12 @@ export function BudgetHero({ overview, month, allowancePence, onEditBudget }: Bu
   const limitPence = progress.limitPence;
   const spentPence = progress.spentPence;
   const remainingPence = progress.remainingPence;
-  const pace = budgetPace(spentPence, limitPence, month);
+  const pace = budgetPace(spentPence, limitPence, period);
   const status = STATUS[pace.status];
   const over = remainingPence < 0;
   const usedPercent = Math.round((progress.ratio ?? 0) * 100);
-  const daysLeft = daysRemainingInMonth(month);
-  const isCurrent = pace.monthElapsed !== null;
+  const daysLeft = daysRemainingInPeriod(period);
+  const isCurrent = pace.elapsed !== null;
 
   const stats: { label: string; value: string }[] = [
     { label: 'Spent', value: formatPenceShort(spentPence) },
@@ -83,7 +94,9 @@ export function BudgetHero({ overview, month, allowancePence, onEditBudget }: Bu
       : {
           label: pace.status === 'upcoming' ? 'Per day' : 'Daily average',
           value: formatPence(
-            Math.round((pace.status === 'upcoming' ? limitPence : spentPence) / daysInMonth(month)),
+            Math.round(
+              (pace.status === 'upcoming' ? limitPence : spentPence) / daysInPeriod(period),
+            ),
           ),
         },
     isCurrent
@@ -92,7 +105,7 @@ export function BudgetHero({ overview, month, allowancePence, onEditBudget }: Bu
   ];
 
   const summary =
-    `${basis === 'monthly' ? 'Monthly budget' : 'Category budgets'} for ${formatMonthName(month)}: ` +
+    `${basis === 'monthly' ? 'Monthly budget' : 'Category budgets'} for ${periodLabel}: ` +
     `${formatPence(Math.abs(remainingPence))} ${over ? 'over' : 'left'} of ${formatPence(limitPence)}. ` +
     `${status.label}. ${usedPercent}% used.`;
 
@@ -136,10 +149,16 @@ export function BudgetHero({ overview, month, allowancePence, onEditBudget }: Bu
       </BudgetRing>
 
       <ThemedText type="footnote" style={[styles.onHeroSecondary, styles.caption]}>
-        {pace.monthElapsed !== null
-          ? `${usedPercent}% used · ${Math.round(pace.monthElapsed * 100)}% of the month gone`
+        {pace.elapsed !== null
+          ? `${usedPercent}% used · ${Math.round(pace.elapsed * 100)}% of the period gone`
           : `${usedPercent}% of the ${basis === 'monthly' ? 'monthly budget' : 'budgets'} used`}
       </ThemedText>
+
+      {isCurrent && upcomingPence > 0 ? (
+        <ThemedText type="caption" style={[styles.onHeroSecondary, styles.caption]}>
+          {`Per day is after ${formatPence(upcomingPence)} of fees still to come out`}
+        </ThemedText>
+      ) : null}
 
       <View style={styles.stats}>
         {stats.map((stat, index) => (

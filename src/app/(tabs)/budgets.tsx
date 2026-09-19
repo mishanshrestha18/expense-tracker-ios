@@ -13,17 +13,25 @@ import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
 import type { Category } from '@/db/types';
-import { type BudgetOverview, budgetOverview, dailyAllowancePence } from '@/domain/budget';
-import { daysRemainingInMonth, formatMonthName } from '@/domain/dates';
+import {
+  type BudgetOverview,
+  budgetOverview,
+  dailyAllowancePence,
+  safeToSpendPence,
+} from '@/domain/budget';
+import { formatMonthName } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
+import { daysRemainingInPeriod, formatPeriodRange, periodNoun } from '@/domain/period';
 import {
   useBudgets,
   useCategories,
-  useMonthSpending,
   useOverallBudget,
+  usePeriodSpending,
 } from '@/hooks/use-app-data';
+import { useUpcomingFees } from '@/hooks/use-recurring';
 import { useTheme } from '@/hooks/use-theme';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useSelectedPeriod } from '@/state/period';
+import { UpcomingFees } from '@/components/upcoming-fees';
 
 interface CategoryLine {
   category: Category;
@@ -34,19 +42,20 @@ interface CategoryLine {
 export default function BudgetsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { month, setMonth } = useSelectedMonth();
+  const { month, setMonth, rule, period, isCurrent } = useSelectedPeriod();
   const { categories } = useCategories();
-  const spending = useMonthSpending(month).data ?? [];
+  const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
+  const upcoming = useUpcomingFees(period);
   const [showIdle, setShowIdle] = useState(false);
 
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const limitBy = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
   const overview = budgetOverview(spending, budgets, overallBudget);
   const allowance = dailyAllowancePence(
-    overview.progress.remainingPence,
-    daysRemainingInMonth(month),
+    safeToSpendPence(overview.progress.remainingPence, upcoming.totalPence),
+    daysRemainingInPeriod(period),
   );
   const totalSpent = overview.totalSpentPence;
 
@@ -65,13 +74,29 @@ export default function BudgetsScreen() {
 
   return (
     <Screen>
-      <MonthSwitcher title="Budgets" month={month} onChange={setMonth} />
+      <MonthSwitcher
+        title="Budgets"
+        month={month}
+        subtitle={rule.kind === 'calendar' ? undefined : formatPeriodRange(period)}
+        isCurrent={isCurrent}
+        noun={periodNoun(rule)}
+        onChange={setMonth}
+      />
 
       <BudgetHero
         overview={overview}
-        month={month}
+        period={period}
+        periodLabel={formatMonthName(month)}
         allowancePence={allowance}
+        upcomingPence={upcoming.totalPence}
         onEditBudget={() => router.push('/budget/monthly')}
+      />
+
+      <UpcomingFees
+        fees={upcoming.fees}
+        totalPence={upcoming.totalPence}
+        noun={periodNoun(rule)}
+        onIgnore={upcoming.ignore}
       />
 
       <Section title="Where it went" detail={formatPence(totalSpent)} variant="large">

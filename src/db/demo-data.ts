@@ -3,7 +3,7 @@
  * install (offered from the empty state in development builds only).
  * Uses a seeded PRNG, so the same day always produces the same data.
  */
-import { addDays, toIsoDate } from '@/domain/dates';
+import { addDays, type IsoDate, toIsoDate } from '@/domain/dates';
 
 import { setBudget, setOverallBudget } from './budgets';
 import { listCategories } from './categories';
@@ -62,6 +62,27 @@ const PATTERNS: Record<string, Pattern> = {
   },
 };
 
+/** Subscriptions and bills that land on the same day every month. */
+const RECURRING = [
+  { note: 'Netflix', category: 'Entertainment', pence: 1099, dayOfMonth: 8 },
+  { note: 'PureGym', category: 'Health', pence: 2499, dayOfMonth: 1 },
+  { note: 'Broadband', category: 'Bills', pence: 3200, dayOfMonth: 18 },
+  { note: 'Spotify', category: 'Entertainment', pence: 1199, dayOfMonth: 27 },
+  { note: 'Phone bill', category: 'Bills', pence: 1800, dayOfMonth: 24 },
+];
+
+/** That day in each of the last `months` months, skipping any date still to come. */
+function monthlyDates(today: Date, dayOfMonth: number, months: number): IsoDate[] {
+  const dates: IsoDate[] = [];
+  for (let back = months; back >= 0; back--) {
+    const date = new Date(today.getFullYear(), today.getMonth() - back, 1);
+    const day = Math.min(dayOfMonth, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate());
+    const iso = toIsoDate(new Date(date.getFullYear(), date.getMonth(), day));
+    if (iso <= toIsoDate(today)) dates.push(iso);
+  }
+  return dates;
+}
+
 /** Small, fast, deterministic PRNG (mulberry32). */
 function createRandom(seed: number) {
   let state = seed >>> 0;
@@ -96,8 +117,15 @@ export async function loadDemoData(db: Db, today: Date = new Date(), months = 6)
         const spentOn = addDays(todayIso, -random.int(0, daysBack));
         const pence = random.int(pattern.amountPounds[0] * 100, pattern.amountPounds[1] * 100);
         await db.runAsync(
-          'INSERT INTO expenses (amount_pence, category_id, note, spent_on) VALUES (?, ?, ?, ?)',
-          [pence, category.id, random.pick(pattern.notes), spentOn],
+          `INSERT INTO expenses (amount_pence, category_id, note, spent_on, paid_with)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            pence,
+            category.id,
+            random.pick(pattern.notes),
+            spentOn,
+            random.pick(['apple-pay', 'apple-pay', 'card', 'cash']),
+          ],
         );
         added++;
       }
@@ -106,6 +134,22 @@ export async function loadDemoData(db: Db, today: Date = new Date(), months = 6)
         await setBudget(db, category.id, pattern.budgetPounds * 100);
       }
     }
+
+    // Regular payments, so the app has something to spot and expect again.
+    const byName = new Map(categories.map((c) => [c.name, c.id]));
+    for (const fee of RECURRING) {
+      const categoryId = byName.get(fee.category);
+      if (categoryId === undefined) continue;
+      for (const spentOn of monthlyDates(today, fee.dayOfMonth, months)) {
+        await db.runAsync(
+          `INSERT INTO expenses (amount_pence, category_id, note, spent_on, paid_with)
+           VALUES (?, ?, ?, ?, 'card')`,
+          [fee.pence, categoryId, fee.note, spentOn],
+        );
+        added++;
+      }
+    }
+
     await setOverallBudget(db, DEMO_MONTHLY_BUDGET_POUNDS * 100);
   });
 

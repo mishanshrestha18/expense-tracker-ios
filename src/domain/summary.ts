@@ -1,18 +1,27 @@
 /** Aggregations that turn raw rows into what the screens and charts show. */
 import type { IsoDate, MonthKey } from './dates';
+import type { Period } from './period';
 
 export interface MonthTotal {
   month: MonthKey;
   totalPence: number;
 }
 
-/** One entry per requested month, in order, with `0` for months without spending. */
-export function fillMonths(
-  months: readonly MonthKey[],
-  totals: readonly MonthTotal[],
+/**
+ * Day totals summed into budget periods, in the order given and with `0` for
+ * periods without spending. Periods do not have to be calendar months, so the
+ * database returns days and the bucketing happens here.
+ */
+export function bucketByPeriod(
+  days: readonly { day: IsoDate; totalPence: number }[],
+  periods: readonly Period[],
 ): MonthTotal[] {
-  const byMonth = new Map(totals.map((t) => [t.month, t.totalPence]));
-  return months.map((month) => ({ month, totalPence: byMonth.get(month) ?? 0 }));
+  return periods.map((period) => ({
+    month: period.key,
+    totalPence: days
+      .filter((d) => d.day >= period.start && d.day < period.end)
+      .reduce((sum, d) => sum + d.totalPence, 0),
+  }));
 }
 
 export interface BreakdownItem<T> {
@@ -37,7 +46,7 @@ export function percentChange(current: number, previous: number): number | null 
   return (current - previous) / previous;
 }
 
-/** Mean of the months that had any spending, so a brand-new app is not dragged down by zeros. */
+/** Mean of the periods that had any spending, so a brand-new app is not dragged down by zeros. */
 export function averageOfActiveMonths(totals: readonly MonthTotal[]): number {
   const active = totals.filter((t) => t.totalPence > 0);
   if (active.length === 0) return 0;

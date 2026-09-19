@@ -7,9 +7,9 @@ import { FormScreen } from '@/components/ui/screen';
 import { removeBudget, setBudget } from '@/db/budgets';
 import { formatMonthName } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
-import { useBudgets, useCategories, useMonthSpending } from '@/hooks/use-app-data';
+import { useBudgets, useCategories, usePeriodSpending } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
-import { useSelectedMonth } from '@/state/selected-month';
+import { useSelectedPeriod } from '@/state/period';
 
 export default function CategoryBudgetScreen() {
   const router = useRouter();
@@ -18,8 +18,8 @@ export default function CategoryBudgetScreen() {
   const id = Number(categoryId);
   const { byId, loaded } = useCategories();
   const budgets = useBudgets().data;
-  const { month } = useSelectedMonth();
-  const spending = useMonthSpending(month).data ?? [];
+  const { month, period } = useSelectedPeriod();
+  const spending = usePeriodSpending(period).data ?? [];
 
   if (!loaded || budgets === undefined) return <FormScreen />;
 

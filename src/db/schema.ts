@@ -168,4 +168,20 @@ export const MIGRATIONS: readonly string[] = [
     monthly_limit_pence INTEGER NOT NULL CHECK (monthly_limit_pence > 0)
   );
   `,
+
+  // v3: app settings (payday rule, alerts), how each expense was paid, and
+  // recurring series the person has dismissed.
+  `
+  CREATE TABLE settings (
+    key   TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+  );
+
+  ALTER TABLE expenses ADD COLUMN paid_with TEXT NOT NULL DEFAULT '';
+
+  CREATE TABLE recurring_ignored (
+    key        TEXT PRIMARY KEY NOT NULL,
+    ignored_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  `,
 ];

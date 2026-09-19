@@ -20,7 +20,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { SiriInboxSync } from '@/siri/siri-inbox-sync';
 import { DataVersionProvider } from '@/state/data-version';
-import { SelectedMonthProvider } from '@/state/selected-month';
+import { PeriodProvider } from '@/state/period';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -46,7 +46,7 @@ export default function RootLayout() {
     <ThemeProvider value={navigationTheme}>
       <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate}>
         <DataVersionProvider>
-          <SelectedMonthProvider>
+          <PeriodProvider>
             <HideSplashScreen />
             <SiriInboxSync />
             <Stack
@@ -80,6 +80,14 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
+                name="settings"
+                options={{
+                  presentation: 'modal',
+                  title: 'Settings',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
                 name="budget/[categoryId]"
                 options={{
                   presentation: 'modal',
@@ -88,7 +96,7 @@ export default function RootLayout() {
                 }}
               />
             </Stack>
-          </SelectedMonthProvider>
+          </PeriodProvider>
         </DataVersionProvider>
       </SQLiteProvider>
       <StatusBar style="auto" />

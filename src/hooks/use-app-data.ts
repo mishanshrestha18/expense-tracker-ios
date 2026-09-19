@@ -2,14 +2,17 @@
 import { getOverallBudget, listBudgets } from '@/db/budgets';
 import { listCategories } from '@/db/categories';
 import {
+  dailyTotals,
   getExpense,
-  listExpensesInMonth,
-  monthlyTotals,
-  spendingByCategory,
+  listExpensesBetween,
+  paidWithTotals,
+  spendingByCategoryBetween,
   totalBetween,
 } from '@/db/expenses';
+import { listIgnoredRecurring } from '@/db/recurring';
 import type { Category } from '@/db/types';
-import type { IsoDate, MonthKey } from '@/domain/dates';
+import type { IsoDate } from '@/domain/dates';
+import type { Period } from '@/domain/period';
 
 import { useDbQuery } from './use-db-query';
 
@@ -20,12 +23,22 @@ export function useCategories() {
   return { categories, byId, loaded: data !== undefined, error };
 }
 
-export function useMonthExpenses(month: MonthKey) {
-  return useDbQuery(`expenses:${month}`, (db) => listExpensesInMonth(db, month));
+export function usePeriodExpenses(period: Period) {
+  return useDbQuery(`expenses:${period.start}:${period.end}`, (db) =>
+    listExpensesBetween(db, period.start, period.end),
+  );
 }
 
-export function useMonthSpending(month: MonthKey) {
-  return useDbQuery(`spending:${month}`, (db) => spendingByCategory(db, month));
+export function usePeriodSpending(period: Period) {
+  return useDbQuery(`spending:${period.start}:${period.end}`, (db) =>
+    spendingByCategoryBetween(db, period.start, period.end),
+  );
+}
+
+export function usePaidWithTotals(period: Period) {
+  return useDbQuery(`paid-with:${period.start}:${period.end}`, (db) =>
+    paidWithTotals(db, period.start, period.end),
+  );
 }
 
 export function useBudgets() {
@@ -37,8 +50,9 @@ export function useOverallBudget() {
   return useDbQuery('overall-budget', getOverallBudget);
 }
 
-export function useMonthlyTotals(first: MonthKey, last: MonthKey) {
-  return useDbQuery(`totals:${first}:${last}`, (db) => monthlyTotals(db, first, last));
+/** Day-by-day totals, which the trend chart buckets into periods. */
+export function useDailyTotals(start: IsoDate, end: IsoDate) {
+  return useDbQuery(`daily:${start}:${end}`, (db) => dailyTotals(db, start, end));
 }
 
 export function useTotalBetween(start: IsoDate, end: IsoDate) {
@@ -47,4 +61,13 @@ export function useTotalBetween(start: IsoDate, end: IsoDate) {
 
 export function useExpense(id: number) {
   return useDbQuery(`expense:${id}`, (db) => getExpense(db, id));
+}
+
+/** Expenses of the last `months` months, for spotting recurring payments. */
+export function useExpenseHistory(start: IsoDate, end: IsoDate) {
+  return useDbQuery(`history:${start}:${end}`, (db) => listExpensesBetween(db, start, end));
+}
+
+export function useIgnoredRecurring() {
+  return useDbQuery('recurring-ignored', listIgnoredRecurring);
 }

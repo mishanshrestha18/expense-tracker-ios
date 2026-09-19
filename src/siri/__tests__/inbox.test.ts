@@ -3,23 +3,27 @@ import { readFileSync } from 'fs';
 import path from 'path';
 
 import { listCategories } from '@/db/categories';
-import { listExpensesInMonth } from '@/db/expenses';
+import { listExpensesBetween } from '@/db/expenses';
 import { DEFAULT_CATEGORIES } from '@/db/schema';
 import type { Db } from '@/db/types';
 import { createTestDb } from '@/test-utils/sqljs-db';
 
-import { importInboxEntries, type InboxEntry, parseInboxEntry } from '../inbox';
+import { importInboxEntries, type InboxItem, parseInboxEntry } from '../inbox';
 
-const siri = (amountPence: number, category: string, spentOn: string): InboxEntry => ({
+const siri = (amountPence: number, category: string, spentOn: string): InboxItem => ({
+  kind: 'expense',
   amountPence,
+  paidWith: '',
   category,
   merchant: '',
   note: '',
   spentOn,
 });
 
-const payment = (amountPence: number, merchant: string, note = merchant): InboxEntry => ({
+const payment = (amountPence: number, merchant: string, note = merchant): InboxItem => ({
+  kind: 'expense',
   amountPence,
+  paidWith: 'apple-pay',
   category: '',
   merchant,
   note,
@@ -50,6 +54,15 @@ describe('parseInboxEntry', () => {
   it('keeps a foreign amount in the note', () => {
     const json = JSON.stringify({ amountText: '€12.00', merchant: 'Café', spentOn: '2026-09-19' });
     expect(parseInboxEntry(json)).toEqual(payment(1200, 'Café', 'Café (€12.00)'));
+  });
+
+  it('reads dictation the phone could not understand', () => {
+    const json = JSON.stringify({ text: ' a tenner on lunch ', spentOn: '2026-09-19' });
+    expect(parseInboxEntry(json)).toEqual({
+      kind: 'text',
+      text: 'a tenner on lunch',
+      spentOn: '2026-09-19',
+    });
   });
 
   it.each([
@@ -93,7 +106,7 @@ describe('importInboxEntries', () => {
 
     const categories = await listCategories(db);
     const nameOf = (id: number) => categories.find((c) => c.id === id)?.name;
-    const expenses = await listExpensesInMonth(db, '2026-09');
+    const expenses = await listExpensesBetween(db, '2026-09-01', '2026-10-01');
     expect(expenses.map((e) => [e.amountPence, nameOf(e.categoryId), e.spentOn])).toEqual([
       [28500, 'Groceries', '2026-09-19'],
       [420, 'Eating out', '2026-09-18'],
@@ -102,7 +115,7 @@ describe('importInboxEntries', () => {
 
   it('files unknown categories under Other rather than losing them', async () => {
     await importInboxEntries(db, [siri(999, 'Pets', '2026-09-19')]);
-    const [expense] = await listExpensesInMonth(db, '2026-09');
+    const [expense] = await listExpensesBetween(db, '2026-09-01', '2026-10-01');
     const other = (await listCategories(db)).find((c) => c.name === 'Other');
     expect(expense.categoryId).toBe(other?.id);
   });
@@ -115,7 +128,7 @@ describe('importInboxEntries', () => {
     ]);
     const categories = await listCategories(db);
     const nameOf = (id: number) => categories.find((c) => c.id === id)?.name;
-    const expenses = await listExpensesInMonth(db, '2026-09');
+    const expenses = await listExpensesBetween(db, '2026-09-01', '2026-10-01');
     expect(expenses.map((e) => [e.amountPence, nameOf(e.categoryId), e.note])).toEqual(
       expect.arrayContaining([
         [6420, 'Groceries', 'TESCO STORES 3021'],
@@ -124,6 +137,19 @@ describe('importInboxEntries', () => {
       ]),
     );
     expect(expenses).toHaveLength(3);
+  });
+
+  it('reads free text with the quick-add parser', async () => {
+    const added = await importInboxEntries(db, [
+      { kind: 'text', text: 'a tenner on lunch', spentOn: '2026-09-19' },
+      { kind: 'text', text: 'nothing useful here', spentOn: '2026-09-19' },
+    ]);
+    expect(added).toBe(1);
+
+    const categories = await listCategories(db);
+    const [expense] = await listExpensesBetween(db, '2026-09-01', '2026-10-01');
+    expect(expense.amountPence).toBe(1000);
+    expect(categories.find((c) => c.id === expense.categoryId)?.name).toBe('Eating out');
   });
 
   it('does nothing for an empty inbox', async () => {

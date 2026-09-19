@@ -1,5 +1,6 @@
-/** Budget maths for a single month. Pure functions over integer pence. */
-import { currentMonthKey, daysInMonth, type MonthKey } from './dates';
+/** Budget maths for a single budget period. Pure functions over integer pence. */
+import { toIsoDate } from './dates';
+import { type Period, periodElapsed } from './period';
 
 export type BudgetStatus = 'none' | 'ok' | 'warning' | 'over';
 
@@ -36,8 +37,8 @@ export type PaceStatus = 'on-track' | 'fast' | 'over' | 'under' | 'upcoming';
 
 export interface BudgetPace {
   status: PaceStatus;
-  /** Share of the month gone (counting today), 0–1. `null` outside the current month. */
-  monthElapsed: number | null;
+  /** Share of the period gone (counting today), 0–1. `null` outside the current period. */
+  elapsed: number | null;
 }
 
 /**
@@ -46,23 +47,33 @@ export interface BudgetPace {
  */
 export const PACE_CUSHION = 0.1;
 
-/** Compares spending with an even spread of the limit across the month. */
+/** Compares spending with an even spread of the limit across the period. */
 export function budgetPace(
   spentPence: number,
   limitPence: number,
-  month: MonthKey,
+  period: Period,
   today: Date = new Date(),
 ): BudgetPace {
-  const current = currentMonthKey(today);
-  if (month > current) return { status: 'upcoming', monthElapsed: null };
+  if (toIsoDate(today) < period.start) return { status: 'upcoming', elapsed: null };
 
-  const monthElapsed = month === current ? today.getDate() / daysInMonth(month) : null;
-  if (spentPence > limitPence) return { status: 'over', monthElapsed };
-  if (monthElapsed === null) return { status: 'under', monthElapsed };
+  const elapsed = periodElapsed(period, today);
+  if (spentPence > limitPence) return { status: 'over', elapsed };
+  if (elapsed === null) return { status: 'under', elapsed };
 
-  const expectedPence = limitPence * monthElapsed;
+  const expectedPence = limitPence * elapsed;
   const status = spentPence - expectedPence > limitPence * PACE_CUSHION ? 'fast' : 'on-track';
-  return { status, monthElapsed };
+  return { status, elapsed };
+}
+
+/**
+ * What is left once the fees still expected this period are set aside, so the
+ * daily allowance does not promise money that rent is about to take.
+ */
+export function safeToSpendPence(
+  remainingPence: number | null,
+  upcomingPence: number,
+): number | null {
+  return remainingPence === null ? null : remainingPence - upcomingPence;
 }
 
 /**

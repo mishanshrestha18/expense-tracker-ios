@@ -22,6 +22,7 @@ describe('parseQuickAdd', () => {
       categoryId: idOf('Groceries'),
       note: '',
       spentOn: '2026-09-19',
+      paidWith: '',
     });
   });
 
@@ -89,6 +90,72 @@ describe('parseQuickAdd', () => {
       categoryId: idOf('Transport'),
     });
     expect(parse('£3 and 50p coffee')).toMatchObject({ amountPence: 350, note: 'Coffee' });
+  });
+
+  it.each([
+    ['forty quid', 4000],
+    ['twelve pounds fifty', 1250],
+    ['three fifty', 350],
+    ['a hundred and twenty', 12000],
+    ['a hundred and twenty five quid', 12500],
+    ['two thousand', 200000],
+    ['twenty-five', 2500],
+    ['eighty pence', 80],
+  ])('understands spoken money in %p', (text, amountPence) => {
+    expect(parse(text)).toMatchObject({ ok: true, amountPence, note: '' });
+  });
+
+  it('reads a bare "twelve fifty" as pounds and pence', () => {
+    expect(parse('twelve fifty')).toMatchObject({ amountPence: 1250, note: '' });
+    expect(parse('twelve fifty five')).toMatchObject({ amountPence: 1255, note: '' });
+    // A scale word is one number, not pounds and pence.
+    expect(parse('two hundred')).toMatchObject({ amountPence: 20000, note: '' });
+    // The second half has to sound like pence.
+    expect(parse('twelve five')).toMatchObject({ amountPence: 1200, note: 'Five' });
+  });
+
+  it.each([
+    ['a fiver', 500],
+    ['tenner', 1000],
+    ['a ton', 10000],
+    ['two grand', 200000],
+    ['a quid', 100],
+    ['2k', 200000],
+    ['1.5k', 150000],
+  ])('understands the slang amount %p', (text, amountPence) => {
+    expect(parse(text)).toMatchObject({ ok: true, amountPence, note: '' });
+  });
+
+  it.each([
+    ['spent a tenner on lunch', 1000, 'Eating out', 'Lunch'],
+    ['forty quid petrol', 4000, 'Transport', 'Petrol'],
+    ['twelve fifty at tesco', 1250, 'Groceries', 'Tesco'],
+    ['two grand rent', 200000, 'Bills', 'Rent'],
+    ['a hundred and twenty quid on clothes', 12000, 'Shopping', 'Clothes'],
+  ])('reads %p as a whole sentence', (text, amountPence, category, note) => {
+    expect(parse(text)).toMatchObject({ amountPence, categoryId: idOf(category), note });
+  });
+
+  it('treats "a" before a slang amount as part of the amount', () => {
+    expect(parse('a fiver on coffee')).toEqual({
+      ok: true,
+      amountPence: 500,
+      categoryId: idOf('Eating out'),
+      note: 'Coffee',
+      spentOn: '2026-09-19',
+      paidWith: '',
+    });
+  });
+
+  it('prefers a spoken amount over a bare number elsewhere', () => {
+    expect(parse('2 coffees a fiver')).toMatchObject({ amountPence: 500, note: '2 coffees' });
+    expect(parse('3 tickets forty quid')).toMatchObject({ amountPence: 4000, note: '3 tickets' });
+  });
+
+  it('still reads digit amounts when words are around them', () => {
+    expect(parse('50p sweets')).toMatchObject({ amountPence: 50, note: 'Sweets' });
+    expect(parse('2 coffees at £3.50')).toMatchObject({ amountPence: 350, note: '2 coffees' });
+    expect(parse('two coffees at £3.50')).toMatchObject({ amountPence: 350, note: 'Two coffees' });
   });
 
   it('does not glue unrelated numbers onto the amount', () => {
