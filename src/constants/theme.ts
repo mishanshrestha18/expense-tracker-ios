@@ -20,7 +20,10 @@ export const Colors = {
     tint: '#047857',
     tintSoft: '#D1FAE5',
     onTint: '#FFFFFF',
+    /** Warning text; dark enough to read on white. */
     warning: '#B54708',
+    /** Warning fills such as progress bars, where brightness matters more than text contrast. */
+    warningFill: '#F79009',
     danger: '#D92D20',
   },
   dark: {
@@ -36,6 +39,7 @@ export const Colors = {
     tintSoft: '#0B3B2C',
     onTint: '#04241A',
     warning: '#FFB340',
+    warningFill: '#FFB340',
     danger: '#FF6961',
   },
 } as const;

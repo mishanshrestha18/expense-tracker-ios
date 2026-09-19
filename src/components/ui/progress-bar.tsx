@@ -12,7 +12,8 @@ interface ProgressBarProps {
 
 export function ProgressBar({ ratio, status, height = 8 }: ProgressBarProps) {
   const theme = useTheme();
-  const fill = status === 'over' ? theme.danger : status === 'warning' ? theme.warning : theme.tint;
+  const fill =
+    status === 'over' ? theme.danger : status === 'warning' ? theme.warningFill : theme.tint;
   const percent = Math.round(Math.min(Math.max(ratio, 0), 1) * 100);
 
   return (

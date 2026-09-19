@@ -59,6 +59,38 @@ export function donutSegments(values: readonly number[], gap = 2): DonutSegment[
   return segments;
 }
 
+export interface StackSegment {
+  index: number;
+  /** Offset along the track, 0–1. */
+  start: number;
+  /** Share of the track, 0–1. */
+  width: number;
+}
+
+/**
+ * Lays `values` end to end on a 0–1 track sized to `capacity` (e.g. a budget).
+ * When the values add up to more than the capacity, the track stretches to fit
+ * them and `limitAt` marks where the capacity ends. Zero values are skipped.
+ */
+export function stackedSegments(
+  values: readonly number[],
+  capacity: number,
+): { segments: StackSegment[]; limitAt: number | null } {
+  const total = values.reduce((sum, v) => sum + Math.max(v, 0), 0);
+  const scale = Math.max(total, capacity);
+  if (scale <= 0) return { segments: [], limitAt: null };
+
+  const segments: StackSegment[] = [];
+  let cursor = 0;
+  values.forEach((value, index) => {
+    if (value <= 0) return;
+    const width = value / scale;
+    segments.push({ index, start: cursor, width });
+    cursor += width;
+  });
+  return { segments, limitAt: total > capacity && capacity > 0 ? capacity / total : null };
+}
+
 /** Rounds up to a "nice" axis maximum: 1, 2, 2.5 or 5 × 10ⁿ. */
 export function niceCeiling(value: number): number {
   if (value <= 0) return 1;

@@ -7,7 +7,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
 import type { Category } from '@/db/types';
 import { budgetProgress } from '@/domain/budget';
-import { formatPenceShort } from '@/domain/money';
+import { formatPence, formatPenceShort } from '@/domain/money';
 import { useTheme } from '@/hooks/use-theme';
 
 interface BudgetRowProps {
@@ -18,6 +18,7 @@ interface BudgetRowProps {
   onPress: () => void;
 }
 
+/** One category: what was spent (the headline number), and how that compares with its budget. */
 export function BudgetRow({
   category,
   spentPence,
@@ -34,19 +35,20 @@ export function BudgetRow({
         ? theme.warning
         : theme.textSecondary;
 
-  let summary: string;
-  if (progress.limitPence === null) {
-    summary = spentPence > 0 ? `${formatPenceShort(spentPence)} spent · no budget` : 'No budget';
-  } else if ((progress.remainingPence ?? 0) >= 0) {
-    summary = `${formatPenceShort(progress.remainingPence ?? 0)} left`;
+  let status: string;
+  if (progress.limitPence === null || progress.remainingPence === null) {
+    status = 'No budget · tap to set one';
+  } else if (progress.remainingPence >= 0) {
+    status = `${formatPenceShort(progress.remainingPence)} left of ${formatPenceShort(progress.limitPence)}`;
   } else {
-    summary = `${formatPenceShort(-(progress.remainingPence ?? 0))} over`;
+    status = `${formatPenceShort(-progress.remainingPence)} over the ${formatPenceShort(progress.limitPence)} budget`;
   }
+  const spent = formatPence(spentPence);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${category.name}. ${summary}`}
+      accessibilityLabel={`${category.name}: ${spent} spent. ${status}`}
       accessibilityHint="Opens the monthly budget for this category"
       onPress={onPress}
       style={({ pressed }) => [
@@ -64,23 +66,28 @@ export function BudgetRow({
         ]}>
         <View style={styles.main}>
           <View style={styles.titleRow}>
-            <ThemedText type="body" numberOfLines={1} style={styles.name}>
+            <ThemedText type="headline" numberOfLines={1} style={styles.name}>
               {category.name}
             </ThemedText>
-            {progress.limitPence !== null ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {formatPenceShort(spentPence)} of {formatPenceShort(progress.limitPence)}
+            <ThemedText
+              type="amount"
+              style={spentPence === 0 ? { color: theme.textTertiary } : undefined}>
+              {spent}
+            </ThemedText>
+          </View>
+          {progress.limitPence !== null ? (
+            <ProgressBar ratio={progress.ratio ?? 0} status={progress.status} height={8} />
+          ) : null}
+          <View style={styles.statusRow}>
+            <ThemedText type="footnote" style={[styles.status, { color: statusColor }]}>
+              {status}
+            </ThemedText>
+            {progress.ratio !== null ? (
+              <ThemedText type="footnote" style={[styles.percent, { color: statusColor }]}>
+                {Math.round(progress.ratio * 100)}%
               </ThemedText>
             ) : null}
           </View>
-          {progress.limitPence !== null ? (
-            <ProgressBar ratio={progress.ratio ?? 0} status={progress.status} height={6} />
-          ) : null}
-          <ThemedText
-            type="footnote"
-            style={{ color: progress.limitPence === null ? theme.tint : statusColor }}>
-            {progress.limitPence === null ? `${summary} · Set one` : summary}
-          </ThemedText>
         </View>
         <Icon
           name={{ ios: 'chevron.right', material: 'chevron_right' }}
@@ -109,7 +116,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    gap: Spacing.one + 2,
+    gap: Spacing.two,
   },
   titleRow: {
     flexDirection: 'row',
@@ -119,5 +126,16 @@ const styles = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  status: {
+    flexShrink: 1,
+  },
+  percent: {
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -6,7 +6,31 @@ import {
   donutSegments,
   niceCeiling,
   polarToCartesian,
+  stackedSegments,
 } from '../chart-geometry';
+
+describe('stackedSegments', () => {
+  it('places values end to end within the capacity', () => {
+    expect(stackedSegments([100, 0, 300], 1000)).toEqual({
+      segments: [
+        { index: 0, start: 0, width: 0.1 },
+        { index: 2, start: 0.1, width: 0.3 },
+      ],
+      limitAt: null,
+    });
+  });
+
+  it('stretches past the capacity and marks where it ends', () => {
+    const { segments, limitAt } = stackedSegments([600, 600], 1000);
+    expect(segments.map((s) => s.width)).toEqual([0.5, 0.5]);
+    expect(limitAt).toBeCloseTo(1000 / 1200);
+  });
+
+  it('draws nothing without values or capacity', () => {
+    expect(stackedSegments([], 0)).toEqual({ segments: [], limitAt: null });
+    expect(stackedSegments([0, 0], 500)).toEqual({ segments: [], limitAt: null });
+  });
+});
 
 describe('polarToCartesian', () => {
   it('starts at 12 o’clock and goes clockwise', () => {
