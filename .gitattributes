@@ -1,0 +1,6 @@
+# Keep LF everywhere (Prettier expects LF) even with core.autocrlf on Windows.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.wasm binary
