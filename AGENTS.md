@@ -10,6 +10,10 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 - Run `npm run check` (type-check, lint, format check, tests) before considering work done.
 - Money is always integer pence; format with `src/domain/money.ts` only at the UI edge.
 - Expenses store a local calendar date (`YYYY-MM-DD`); use the helpers in `src/domain/dates.ts`.
+- A budget period is not always a calendar month. Use `src/domain/period.ts` and the
+  `useSelectedPeriod()` context, never `daysInMonth`/`monthRange`, for anything budget related.
+- The Swift App Intents in `native/` read `Documents/budget-snapshot.json`, which
+  `src/siri/budget-snapshot.ts` writes. Changing that shape means changing both sides.
 - Business logic lives in `src/domain` as pure functions with tests in `__tests__`.
 - Repositories in `src/db` take the `Db` interface so tests can run them on sql.js. Schema
   changes are new entries appended to `MIGRATIONS` in `src/db/schema.ts`; never edit a shipped

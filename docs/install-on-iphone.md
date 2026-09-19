@@ -65,13 +65,27 @@ Say the category, and Siri asks how much:
 - "Hey Siri, add to my expenses" (Siri asks for the category, then the amount)
 
 "My expenses", "my budget", "my spending" and "Expenses" all work as the app's
-name. Siri replies "Added £285.00 to Groceries." and the expense appears the next
-time you open the app.
+name. Siri replies "Added £285.00 to Groceries. £41.00 left for Groceries this
+month." and the expense appears the next time you open the app.
+
+Say a whole sentence instead:
+
+- "Hey Siri, quick add in my expenses" → "What did you spend?" → "forty quid
+  petrol and three pounds fifty on coffee"
+
+On an iPhone with Apple Intelligence that is read on the phone itself and
+answered straight away. On other iPhones it is stored as you said it and read
+when you next open the app. Nothing is sent anywhere either way.
+
+Ask about your money:
+
+- "Hey Siri, how much can I spend today in my budget?"
+- "Hey Siri, what's left for eating out in my expenses?"
 
 To use your own words, make a personal shortcut: in the Shortcuts app, tap **+**,
-add the **Add Expense** action and name the shortcut something like "I spent
-money". Then "Hey Siri, I spent money" asks for the category and the amount. The
-shortcut also works from the Action Button or Back Tap.
+add the **Add Expense** or **Quick Add** action and name the shortcut something
+like "I spent money". Then "Hey Siri, I spent money" runs it. The shortcut also
+works from the Action Button or Back Tap.
 
 ## 4. Add Apple Pay payments automatically
 
@@ -91,6 +105,11 @@ out, TfL → Transport, …) and keeps the name as the note. Shops it doesn't kn
 under Other, and you can change the category in the app. Payments in other
 currencies are added as they are, with the original amount in the note. Refunds
 and £0.00 transit taps are skipped.
+
+To see each tap as it happens — "£3.50 at Pret · £41.00 left for Eating out this
+month" — open **Expenses → Settings** (the gear on the Overview tab) and turn on
+**Notify me when a payment is added**. The same screen sets your **budget
+period**, if your money arrives on payday rather than the 1st.
 
 iOS only sees payments made with Apple Pay on the iPhone. Tapping a physical card
 doesn't involve the phone, so those payments can't be added automatically.

@@ -1,8 +1,8 @@
 # Expenses
 
 A personal expense tracker for iPhone, built with **Expo (React Native) and TypeScript**.
-Log spending the way you would say it — _"285 groceries"_, _"£4.20 coffee yesterday"_ — set
-monthly budgets per category, and see where your money goes.
+Log spending the way you would say it — _"285 groceries"_, _"a tenner on lunch"_ — or don't log
+it at all: Apple Pay taps add themselves, and Siri answers what is left before you spend.
 
 Everything is stored on the device. No account, no server.
 
@@ -14,15 +14,29 @@ Everything is stored on the device. No account, no server.
 - **Budgets** — one overall monthly budget, a limit per category, or both. Warnings at 80%, an
   over-budget state, a "£X per day to stay on track" allowance, and a check that the category
   limits fit inside the monthly budget.
+- **Payday budgets** — a budget period can run payday to payday instead of the 1st to the 31st,
+  including "the last working day" and moving a weekend payday to the Friday before. Budgets,
+  charts and the daily allowance all follow it.
 - **Insights** — spending by category (donut chart), change versus the same point last month,
   monthly average and a six-month trend with the monthly budget marked (bar chart).
 - **Native feel** — iOS tab bar (Liquid Glass on iOS 26+), modal sheets, the native date picker,
   haptics, light and dark mode, and VoiceOver labels throughout.
 - **Offline-first** — SQLite on the device with versioned schema migrations.
-- **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285", through a native
-  Swift App Intent ([native/LogExpenseIntent.swift](native/LogExpenseIntent.swift)).
+- **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285", through native
+  Swift App Intents ([native/LogExpenseIntent.swift](native/LogExpenseIntent.swift)).
+- **Siri answers back** — "How much can I spend today?" → "£23 a day keeps you on track", and
+  "What's left for eating out?" → "£41 left". Answers come from a small budget summary the app
+  publishes, so nothing has to open.
 - **Apple Pay, automatically** — a Wallet automation hands each Apple Pay payment to the app,
-  which files it by merchant (Tesco → Groceries, Pret → Eating out) and keeps the shop as the note.
+  which files it by merchant (Tesco → Groceries, Pret → Eating out), and the tap replies with
+  what is left in that category.
+- **On-device AI** — "quick add" takes a whole sentence, read by Apple's on-device model on
+  iPhones with Apple Intelligence, and by the app's own parser everywhere else. Nothing leaves
+  the phone either way.
+- **Recurring fees** — regular payments are spotted from your history and listed as "still to
+  come this month", and that money is set aside before the daily allowance is worked out.
+- **Cash and cards in one place** — each expense records how it was paid, so the split that
+  bank apps miss is right there.
 
 ## Tech stack
 
@@ -61,7 +75,8 @@ src/
 ├── domain/       Pure business logic: money, dates, quick-add parser, budgets, chart geometry
 ├── db/           Schema, migrations and repositories
 ├── hooks/        Data hooks built on useDbQuery / useDbMutation
-├── state/        App-wide context: selected month, data version
+├── siri/         The App Intents bridge: inbox import and the budget summary
+├── state/        App-wide context: selected period, data version
 └── test-utils/   In-memory SQLite for tests
 ```
 
@@ -73,8 +88,11 @@ Key decisions:
   never shift with time zones or daylight saving.
 - **Repositories depend on a small `Db` interface**, not on `expo-sqlite` directly. The
   same SQL runs on the phone and against an in-memory `sql.js` database in Jest.
-- **The quick-add parser is pure and exhaustively tested**, because it will also back Siri and
-  Shortcuts (see the roadmap).
+- **The quick-add parser is pure and exhaustively tested**, because it also reads what Siri
+  hears on iPhones without Apple Intelligence.
+- **The App Intents never touch SQLite.** Two copies of SQLite writing one file can corrupt it,
+  so intents drop JSON files in `Documents/siri-inbox/` and read a budget summary the app
+  publishes to `Documents/budget-snapshot.json`.
 - **No state library.** Reads go through `useDbQuery`; every write bumps a version in context,
   and queries re-run. It is small, explicit and enough for a single-user, on-device app.
 
@@ -114,6 +132,8 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 
 - [x] **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285".
 - [x] **Apple Pay** — payments added automatically through a Wallet transaction automation.
+- [x] **Siri questions** — what's left today, and what's left for a category.
+- [x] **Payday budget periods**, recurring-fee detection, and a cash versus card split.
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).
 - [ ] **Action Button and Back Tap** — one press, say "285 groceries", done.

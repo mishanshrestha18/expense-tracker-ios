@@ -76,7 +76,10 @@ function monthlyDates(today: Date, dayOfMonth: number, months: number): IsoDate[
   const dates: IsoDate[] = [];
   for (let back = months; back >= 0; back--) {
     const date = new Date(today.getFullYear(), today.getMonth() - back, 1);
-    const day = Math.min(dayOfMonth, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate());
+    const day = Math.min(
+      dayOfMonth,
+      new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(),
+    );
     const iso = toIsoDate(new Date(date.getFullYear(), date.getMonth(), day));
     if (iso <= toIsoDate(today)) dates.push(iso);
   }
@@ -159,6 +162,8 @@ export async function loadDemoData(db: Db, today: Date = new Date(), months = 6)
 /** Deletes every expense and budget. Categories are kept. */
 export async function clearAllData(db: Db): Promise<void> {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM expenses; DELETE FROM budgets; DELETE FROM overall_budget;');
+    await db.execAsync(
+      'DELETE FROM expenses; DELETE FROM budgets; DELETE FROM overall_budget; DELETE FROM recurring_ignored;',
+    );
   });
 }
