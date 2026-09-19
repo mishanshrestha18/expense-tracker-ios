@@ -188,7 +188,8 @@ struct BudgetSnapshot: Decodable {
   let monthlyLimitPence: Int?
   let spentPence: Int
   let upcomingPence: Int
-  let paymentAlerts: Bool
+  /// Optional so an older summary still decodes after an update.
+  let paymentAlerts: Bool?
   let categories: [CategoryInfo]
 
   static func load() -> BudgetSnapshot? {
@@ -216,18 +217,27 @@ struct Budget {
 
   init?(today: String = CalendarDate.today()) {
     guard let snapshot = BudgetSnapshot.load() else { return nil }
+    // Worked out in locals first: a closure below cannot capture a property
+    // while the rest are still uninitialised.
+    let current: BudgetSnapshot.PeriodInfo
+    let rolled: Bool
     if today < snapshot.period.end {
-      period = snapshot.period
-      rolledOver = false
+      current = snapshot.period
+      rolled = false
     } else if today < snapshot.next.end {
-      period = snapshot.next
-      rolledOver = true
+      current = snapshot.next
+      rolled = true
     } else {
       return nil  // Too old to be worth repeating.
     }
+
     self.snapshot = snapshot
     self.today = today
-    pending = SiriInbox.pending().filter { $0.spentOn >= period.start && $0.spentOn < period.end }
+    period = current
+    rolledOver = rolled
+    pending = SiriInbox.pending().filter {
+      $0.spentOn >= current.start && $0.spentOn < current.end
+    }
   }
 
   var noun: String { snapshot.noun }
