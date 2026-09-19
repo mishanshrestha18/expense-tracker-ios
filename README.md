@@ -24,17 +24,17 @@ Everything is stored on the device. No account, no server.
 
 ## Tech stack
 
-| Area       | Choice                                                                               |
-| ---------- | ------------------------------------------------------------------------------------ |
-| App        | Expo SDK 57, React Native 0.86, React 19.2 with the React Compiler                   |
-| Language   | TypeScript 6 in strict mode                                                          |
-| Navigation | Expo Router (file-based), native tabs and modal screens                              |
-| Storage    | `expo-sqlite` with versioned migrations; money stored as integer pence               |
-| Charts     | Hand-rolled SVG with `react-native-svg`; the geometry is unit tested                 |
-| Testing    | Jest (`jest-expo`) + `sql.js`, so repository tests run against a real SQLite engine  |
-| Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                        |
-| Siri       | Swift App Intents compiled into the app target via Expo inline modules               |
-| iOS builds | Unsigned IPA built on a GitHub-hosted Mac, installed with Sideloadly — no Mac needed |
+| Area       | Choice                                                                              |
+| ---------- | ----------------------------------------------------------------------------------- |
+| App        | Expo SDK 57, React Native 0.86, React 19.2 with the React Compiler                  |
+| Language   | TypeScript 6 in strict mode                                                         |
+| Navigation | Expo Router (file-based), native tabs and modal screens                             |
+| Storage    | `expo-sqlite` with versioned migrations; money stored as integer pence              |
+| Charts     | Hand-rolled SVG with `react-native-svg`; the geometry is unit tested                |
+| Testing    | Jest (`jest-expo`) + `sql.js`, so repository tests run against a real SQLite engine |
+| Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                       |
+| Siri       | Swift App Intents compiled into the app target via Expo inline modules              |
+| iOS builds | IPA built on a GitHub-hosted Mac, installed with Sideloadly — no Mac needed         |
 
 ## Architecture
 

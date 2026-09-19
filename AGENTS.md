@@ -5,7 +5,8 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 ## Project notes
 
 - Personal iPhone expense tracker. Development happens on Windows without a Mac: test in Expo Go
-  and build in the cloud with EAS. Do not suggest steps that need Xcode locally.
+  and build in the cloud with GitHub Actions (`docs/install-on-iphone.md`). Do not suggest steps
+  that need Xcode locally.
 - Run `npm run check` (type-check, lint, format check, tests) before considering work done.
 - Money is always integer pence; format with `src/domain/money.ts` only at the UI edge.
 - Expenses store a local calendar date (`YYYY-MM-DD`); use the helpers in `src/domain/dates.ts`.

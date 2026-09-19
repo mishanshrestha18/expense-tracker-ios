@@ -14,14 +14,21 @@ you re-sign every week (a couple of clicks, and your data stays).
    artifact from the run page, or with `gh run download --name Expenses-ipa`,
    and unzip it to get `Expenses.ipa`.
 
-The build is unsigned; the next step signs it for your phone.
+The build is only ad-hoc signed; the next step signs it properly for your phone.
 
 ## 2. Install it with Sideloadly (Windows)
 
 One-time setup:
 
-1. Install **iTunes** and **iCloud** from apple.com — the downloads from Apple's
-   website, not the Microsoft Store versions — then restart the PC.
+1. Install the web (non-Microsoft Store) versions of **iTunes** and **iCloud**;
+   Sideloadly can't use the Store versions, so uninstall those first. Apple's
+   pages only offer the Store versions now, so use Apple's direct downloads (the
+   same links sideloadly.io gives):
+   - iTunes 64-bit: <https://www.apple.com/itunes/download/win64>
+   - iCloud: <https://updates.cdn-apple.com/2020/windows/001-39935-20200911-1A70AA56-F448-11EA-8CC0-99D41950005E/iCloudSetup.exe>
+
+   Then restart the PC.
+
 2. Install **Sideloadly** from [sideloadly.io](https://sideloadly.io).
 
 > **Security:** Sideloadly asks for an Apple ID and password to sign the app,
@@ -33,11 +40,11 @@ Each install:
 1. Connect the iPhone with a cable, unlock it and tap **Trust** if asked.
 2. Open Sideloadly, drag `Expenses.ipa` in, enter your Apple ID, press **Start**,
    and enter the verification code Apple sends you.
-3. On the iPhone, the first time only:
-   - **Settings → General → VPN & Device Management** → tap your Apple ID →
-     **Trust**.
+3. On the iPhone, the first time only, in this order:
    - **Settings → Privacy & Security → Developer Mode** → on, then restart the
-     phone and confirm.
+     phone and confirm. The switch only appears once an app has been sideloaded.
+   - **Settings → General → VPN & Device Management** → under **Developer App**,
+     tap your Apple ID → **Trust**.
 4. Open **Expenses** once.
 
 ## 3. Use Siri
