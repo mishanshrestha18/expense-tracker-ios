@@ -47,6 +47,32 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 export type Theme = { [K in ThemeColor]: string };
 
+/**
+ * Gradient hero cards, shared by light and dark mode. Every stop keeps white
+ * text above 4.5:1 contrast.
+ */
+export const HeroGradients = {
+  good: ['#064E3B', '#047857'],
+  warning: ['#78350F', '#B45309'],
+  danger: ['#7F1D1D', '#B91C1C'],
+} as const;
+
+export type HeroTone = keyof typeof HeroGradients;
+
+/** Foreground colours for content placed on a hero gradient. */
+export const OnHero = {
+  text: '#FFFFFF',
+  textSecondary: 'rgba(255, 255, 255, 0.78)',
+  track: 'rgba(255, 255, 255, 0.22)',
+  surface: 'rgba(255, 255, 255, 0.16)',
+  divider: 'rgba(255, 255, 255, 0.2)',
+} as const;
+
+export function heroGradient(tone: HeroTone): string {
+  const [from, to] = HeroGradients[tone];
+  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
+}
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

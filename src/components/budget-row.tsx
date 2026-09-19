@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { CategoryBadge } from '@/components/category-badge';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
 import type { Category } from '@/db/types';
@@ -14,48 +15,49 @@ interface BudgetRowProps {
   category: Category;
   spentPence: number;
   limitPence: number | null;
+  /** This category's share of the month's spending, 0–1. */
+  share: number;
   showSeparator: boolean;
   onPress: () => void;
 }
 
-/** One category: what was spent (the headline number), and how that compares with its budget. */
+/** One category: the amount spent leads, with its limit (if any) underneath. */
 export function BudgetRow({
   category,
   spentPence,
   limitPence,
+  share,
   showSeparator,
   onPress,
 }: BudgetRowProps) {
   const theme = useTheme();
   const progress = budgetProgress(spentPence, limitPence);
-  const statusColor =
-    progress.status === 'over'
-      ? theme.danger
-      : progress.status === 'warning'
-        ? theme.warning
-        : theme.textSecondary;
+  const isOver = progress.status === 'over';
+  const isWarning = progress.status === 'warning';
+  const statusColor = isOver ? theme.danger : isWarning ? theme.warning : theme.textSecondary;
 
   let status: string;
   if (progress.limitPence === null || progress.remainingPence === null) {
-    status = 'No budget · tap to set one';
+    status =
+      spentPence > 0
+        ? `${Math.round(share * 100)}% of spending · no limit`
+        : 'No spending · no limit';
   } else if (progress.remainingPence >= 0) {
     status = `${formatPenceShort(progress.remainingPence)} left of ${formatPenceShort(progress.limitPence)}`;
   } else {
-    status = `${formatPenceShort(-progress.remainingPence)} over the ${formatPenceShort(progress.limitPence)} budget`;
+    status = `${formatPenceShort(-progress.remainingPence)} over the ${formatPenceShort(progress.limitPence)} limit`;
   }
   const spent = formatPence(spentPence);
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${category.name}: ${spent} spent. ${status}`}
-      accessibilityHint="Opens the monthly budget for this category"
+      accessibilityHint="Opens the monthly limit for this category"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && { backgroundColor: theme.backgroundSelected },
-      ]}>
-      <CategoryBadge category={category} />
+      pressedScale={0.98}
+      style={styles.row}>
+      <CategoryBadge category={category} size={40} />
       <View
         style={[
           styles.body,
@@ -64,38 +66,51 @@ export function BudgetRow({
             borderBottomWidth: StyleSheet.hairlineWidth,
           },
         ]}>
-        <View style={styles.main}>
-          <View style={styles.titleRow}>
-            <ThemedText type="headline" numberOfLines={1} style={styles.name}>
-              {category.name}
-            </ThemedText>
-            <ThemedText
-              type="amount"
-              style={spentPence === 0 ? { color: theme.textTertiary } : undefined}>
-              {spent}
-            </ThemedText>
-          </View>
-          {progress.limitPence !== null ? (
-            <ProgressBar ratio={progress.ratio ?? 0} status={progress.status} height={8} />
-          ) : null}
-          <View style={styles.statusRow}>
-            <ThemedText type="footnote" style={[styles.status, { color: statusColor }]}>
+        <View style={styles.titleRow}>
+          <ThemedText type="headline" numberOfLines={1} style={styles.name}>
+            {category.name}
+          </ThemedText>
+          <ThemedText
+            type="amount"
+            style={spentPence === 0 ? { color: theme.textTertiary } : undefined}>
+            {spent}
+          </ThemedText>
+        </View>
+
+        {progress.ratio !== null ? (
+          <ProgressBar
+            ratio={progress.ratio}
+            status={progress.status}
+            color={category.color}
+            height={6}
+          />
+        ) : null}
+
+        <View style={styles.metaRow}>
+          <View style={styles.status}>
+            {isOver || isWarning ? (
+              <Icon
+                name={
+                  isOver
+                    ? { ios: 'exclamationmark.triangle.fill', material: 'warning' }
+                    : { ios: 'exclamationmark.circle.fill', material: 'error' }
+                }
+                size={12}
+                color={statusColor}
+              />
+            ) : null}
+            <ThemedText type="footnote" numberOfLines={1} style={{ color: statusColor }}>
               {status}
             </ThemedText>
-            {progress.ratio !== null ? (
-              <ThemedText type="footnote" style={[styles.percent, { color: statusColor }]}>
-                {Math.round(progress.ratio * 100)}%
-              </ThemedText>
-            ) : null}
           </View>
+          {progress.ratio !== null ? (
+            <ThemedText type="footnote" style={[styles.percent, { color: statusColor }]}>
+              {Math.round(progress.ratio * 100)}%
+            </ThemedText>
+          ) : null}
         </View>
-        <Icon
-          name={{ ios: 'chevron.right', material: 'chevron_right' }}
-          size={14}
-          color={theme.textTertiary}
-        />
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -104,19 +119,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: Spacing.three,
-    gap: Spacing.three,
+    gap: Spacing.three - 2,
   },
   body: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.two,
     paddingVertical: Spacing.three - 2,
     paddingRight: Spacing.three,
-  },
-  main: {
-    flex: 1,
-    gap: Spacing.two,
   },
   titleRow: {
     flexDirection: 'row',
@@ -127,12 +136,16 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
   },
-  statusRow: {
+  metaRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
   status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
     flexShrink: 1,
   },
   percent: {

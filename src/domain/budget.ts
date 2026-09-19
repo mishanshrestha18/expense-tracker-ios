@@ -1,4 +1,5 @@
 /** Budget maths for a single month. Pure functions over integer pence. */
+import { currentMonthKey, daysInMonth, type MonthKey } from './dates';
 
 export type BudgetStatus = 'none' | 'ok' | 'warning' | 'over';
 
@@ -22,6 +23,46 @@ export function budgetProgress(spentPence: number, limitPence: number | null): B
   const ratio = spentPence / limitPence;
   const status: BudgetStatus = ratio > 1 ? 'over' : ratio >= WARNING_RATIO ? 'warning' : 'ok';
   return { spentPence, limitPence, remainingPence: limitPence - spentPence, ratio, status };
+}
+
+/**
+ * - `on-track`: spending is at or below a straight-line pace through the month
+ * - `fast`: noticeably ahead of that pace, though still within the limit
+ * - `over`: the limit is already exceeded
+ * - `under`: a finished month that stayed within the limit
+ * - `upcoming`: a month that has not started
+ */
+export type PaceStatus = 'on-track' | 'fast' | 'over' | 'under' | 'upcoming';
+
+export interface BudgetPace {
+  status: PaceStatus;
+  /** Share of the month gone (counting today), 0–1. `null` outside the current month. */
+  monthElapsed: number | null;
+}
+
+/**
+ * Slack before "spending fast", as a share of the limit, so one early bill
+ * (rent on the 1st) does not immediately raise the alarm.
+ */
+export const PACE_CUSHION = 0.1;
+
+/** Compares spending with an even spread of the limit across the month. */
+export function budgetPace(
+  spentPence: number,
+  limitPence: number,
+  month: MonthKey,
+  today: Date = new Date(),
+): BudgetPace {
+  const current = currentMonthKey(today);
+  if (month > current) return { status: 'upcoming', monthElapsed: null };
+
+  const monthElapsed = month === current ? today.getDate() / daysInMonth(month) : null;
+  if (spentPence > limitPence) return { status: 'over', monthElapsed };
+  if (monthElapsed === null) return { status: 'under', monthElapsed };
+
+  const expectedPence = limitPence * monthElapsed;
+  const status = spentPence - expectedPence > limitPence * PACE_CUSHION ? 'fast' : 'on-track';
+  return { status, monthElapsed };
 }
 
 /**

@@ -1,19 +1,21 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BudgetHero } from '@/components/budget-hero';
 import { BudgetRow } from '@/components/budget-row';
 import { StackedBar } from '@/components/charts/stacked-bar';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
 import type { Category } from '@/db/types';
 import { type BudgetOverview, budgetOverview, dailyAllowancePence } from '@/domain/budget';
-import { daysRemainingInMonth } from '@/domain/dates';
-import { formatPence, formatPenceShort } from '@/domain/money';
+import { daysRemainingInMonth, formatMonthName } from '@/domain/dates';
+import { formatPence } from '@/domain/money';
 import {
   useBudgets,
   useCategories,
@@ -29,15 +31,15 @@ interface CategoryLine {
   limitPence: number | null;
 }
 
-const LEGEND_ITEMS = 3;
-
 export default function BudgetsScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const { month, setMonth } = useSelectedMonth();
   const { categories } = useCategories();
   const spending = useMonthSpending(month).data ?? [];
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
+  const [showIdle, setShowIdle] = useState(false);
 
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const limitBy = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
@@ -46,6 +48,7 @@ export default function BudgetsScreen() {
     overview.progress.remainingPence,
     daysRemainingInMonth(month),
   );
+  const totalSpent = overview.totalSpentPence;
 
   // Biggest spending first; categories with nothing spent keep their usual order.
   const lines: CategoryLine[] = categories
@@ -55,222 +58,138 @@ export default function BudgetsScreen() {
       limitPence: limitBy.get(category.id) ?? null,
     }))
     .sort((a, b) => b.spentPence - a.spentPence);
-
-  // The summary bar shows whatever its headline figure counts.
-  const counted = lines.filter(
-    (line) => line.spentPence > 0 && (overview.basis === 'monthly' || line.limitPence !== null),
-  );
+  // Categories with no spending and no limit are tucked away until asked for.
+  const idle = lines.filter((line) => line.spentPence === 0 && line.limitPence === null);
+  const visible = showIdle ? lines : lines.filter((line) => !idle.includes(line));
+  const spenders = lines.filter((line) => line.spentPence > 0);
 
   return (
     <Screen>
       <MonthSwitcher title="Budgets" month={month} onChange={setMonth} />
 
-      <BudgetSummary
+      <BudgetHero
         overview={overview}
-        lines={counted}
+        month={month}
         allowancePence={allowance}
-        onEditMonthly={() => router.push('/budget/monthly')}
+        onEditBudget={() => router.push('/budget/monthly')}
       />
 
-      <Section
-        title="Spending by category"
-        detail={
-          overview.categoryLimitsPence > 0
-            ? `${formatPence(overview.categoryLimitsPence)} budgeted`
-            : undefined
-        }>
+      <Section title="Where it went" detail={formatPence(totalSpent)} variant="large">
         <Card flush>
-          {lines.map((line, index) => (
+          {spenders.length > 0 ? (
+            <View style={styles.distribution}>
+              <StackedBar
+                items={spenders.map((line) => ({
+                  key: String(line.category.id),
+                  value: line.spentPence,
+                  color: line.category.color,
+                }))}
+                capacity={totalSpent}
+                height={10}
+                accessibilityLabel={`Spending split: ${spenders
+                  .map(
+                    (line) =>
+                      `${line.category.name} ${Math.round((line.spentPence / totalSpent) * 100)}%`,
+                  )
+                  .join(', ')}`}
+              />
+            </View>
+          ) : (
+            <ThemedText type="callout" themeColor="textSecondary" style={styles.empty}>
+              Nothing spent in {formatMonthName(month)} yet.
+            </ThemedText>
+          )}
+
+          {visible.map((line, index) => (
             <BudgetRow
               key={line.category.id}
               category={line.category}
               spentPence={line.spentPence}
               limitPence={line.limitPence}
-              showSeparator={index < lines.length - 1}
+              share={totalSpent > 0 ? line.spentPence / totalSpent : 0}
+              showSeparator={index < visible.length - 1 || idle.length > 0}
               onPress={() => router.push(`/budget/${line.category.id}`)}
             />
           ))}
+
+          {idle.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showIdle }}
+              onPress={() => setShowIdle((shown) => !shown)}
+              style={({ pressed }) => [styles.toggle, pressed && styles.pressed]}>
+              <ThemedText type="smallBold" style={{ color: theme.tint }}>
+                {showIdle
+                  ? 'Show less'
+                  : `Show ${idle.length} more ${idle.length === 1 ? 'category' : 'categories'}`}
+              </ThemedText>
+              <Icon
+                name={
+                  showIdle
+                    ? { ios: 'chevron.up', material: 'expand_less' }
+                    : { ios: 'chevron.down', material: 'expand_more' }
+                }
+                size={12}
+                color={theme.tint}
+              />
+            </Pressable>
+          ) : null}
         </Card>
       </Section>
 
-      {overview.basis === 'categories' && overview.unbudgetedSpentPence > 0 ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.footnote}>
-          You also spent {formatPence(overview.unbudgetedSpentPence)} in categories without a
-          budget.
-        </ThemedText>
-      ) : null}
+      <Footnote overview={overview} />
     </Screen>
   );
 }
 
-interface BudgetSummaryProps {
-  overview: BudgetOverview;
-  /** Spending that counts towards the headline figure, biggest first. */
-  lines: readonly CategoryLine[];
-  allowancePence: number | null;
-  onEditMonthly: () => void;
-}
-
-/** The headline card: the monthly budget when set, otherwise the category budgets combined. */
-function BudgetSummary({ overview, lines, allowancePence, onEditMonthly }: BudgetSummaryProps) {
+/** One line of context about how category limits relate to the headline budget. */
+function Footnote({ overview }: { overview: BudgetOverview }) {
   const theme = useTheme();
-  const { basis, progress } = overview;
+  let text: string;
+  let color: string = theme.textSecondary;
 
-  if (basis === 'none' || progress.limitPence === null || progress.remainingPence === null) {
-    return (
-      <Card style={styles.summary}>
-        <View style={styles.intro}>
-          <ThemedText type="headline">No budgets yet</ThemedText>
-          <ThemedText type="callout" themeColor="textSecondary">
-            Set one monthly budget for everything you spend, give categories their own limits below,
-            or both. Expenses warns you at 80%.
-          </ThemedText>
-        </View>
-        <Button
-          title="Set monthly budget"
-          icon={{ ios: 'plus', material: 'add' }}
-          onPress={onEditMonthly}
-        />
-      </Card>
-    );
+  if (overview.basis === 'monthly' && overview.categoryLimitsPence > 0) {
+    const unallocated = overview.unallocatedPence ?? 0;
+    if (unallocated < 0) {
+      text = `Category limits add up to ${formatPence(overview.categoryLimitsPence)}, ${formatPence(-unallocated)} more than your monthly budget.`;
+      color = theme.warning;
+    } else {
+      text = `Category limits use ${formatPence(overview.categoryLimitsPence)} of your ${formatPence(overview.monthlyLimitPence ?? 0)} monthly budget.`;
+    }
+  } else if (overview.basis === 'categories' && overview.unbudgetedSpentPence > 0) {
+    text = `${formatPence(overview.unbudgetedSpentPence)} was spent in categories without a limit.`;
+  } else {
+    text = 'Tap a category to give it its own monthly limit.';
   }
 
-  const isMonthly = basis === 'monthly';
-  const over = progress.remainingPence < 0;
-  const heading = isMonthly
-    ? over
-      ? 'Over your monthly budget by'
-      : 'Left in your monthly budget'
-    : over
-      ? 'Over your category budgets by'
-      : 'Left in your category budgets';
-  const hiddenCount = lines.length - LEGEND_ITEMS;
-
   return (
-    <Card style={styles.summary}>
-      <View style={styles.headerRow}>
-        <View style={styles.flex}>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {heading}
-          </ThemedText>
-          <ThemedText type="amountLarge" style={over ? { color: theme.danger } : undefined}>
-            {formatPence(Math.abs(progress.remainingPence))}
-          </ThemedText>
-        </View>
-        {isMonthly ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Edit monthly budget"
-            hitSlop={8}
-            onPress={onEditMonthly}>
-            <ThemedText type="linkPrimary">Edit</ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <StackedBar
-        items={lines.map((line) => ({
-          key: String(line.category.id),
-          value: line.spentPence,
-          color: line.category.color,
-        }))}
-        capacity={progress.limitPence}
-        accessibilityLabel={`${formatPence(progress.spentPence)} of ${formatPence(progress.limitPence)} spent: ${lines
-          .map((line) => `${line.category.name} ${formatPence(line.spentPence)}`)
-          .join(', ')}`}
-      />
-
-      {lines.length > 0 ? (
-        <View style={styles.legend}>
-          {lines.slice(0, LEGEND_ITEMS).map((line) => (
-            <View key={line.category.id} style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: line.category.color }]} />
-              <ThemedText type="footnote">
-                {line.category.name}{' '}
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  {formatPenceShort(line.spentPence)}
-                </ThemedText>
-              </ThemedText>
-            </View>
-          ))}
-          {hiddenCount > 0 ? (
-            <ThemedText type="footnote" themeColor="textSecondary">
-              +{hiddenCount} more
-            </ThemedText>
-          ) : null}
-        </View>
-      ) : null}
-
-      <View style={styles.row}>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {formatPence(progress.spentPence)} of {formatPence(progress.limitPence)} spent
-        </ThemedText>
-        {allowancePence !== null ? (
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {formatPence(allowancePence)}/day to stay on track
-          </ThemedText>
-        ) : null}
-      </View>
-
-      {isMonthly && overview.unallocatedPence !== null && overview.categoryLimitsPence > 0 ? (
-        <ThemedText
-          type="footnote"
-          style={{ color: overview.unallocatedPence < 0 ? theme.warning : theme.textSecondary }}>
-          {overview.unallocatedPence < 0
-            ? `Your category budgets add up to ${formatPence(overview.categoryLimitsPence)}, ${formatPence(-overview.unallocatedPence)} more than this budget.`
-            : `${formatPence(overview.categoryLimitsPence)} of this is split across category budgets.`}
-        </ThemedText>
-      ) : null}
-
-      {!isMonthly ? (
-        <Pressable accessibilityRole="button" hitSlop={8} onPress={onEditMonthly}>
-          <ThemedText type="linkPrimary">Set an overall monthly budget →</ThemedText>
-        </Pressable>
-      ) : null}
-    </Card>
+    <ThemedText type="footnote" style={[styles.footnote, { color }]}>
+      {text}
+    </ThemedText>
   );
 }
 
 const styles = StyleSheet.create({
-  summary: {
-    gap: Spacing.three,
+  distribution: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three - 4,
+    paddingBottom: Spacing.one,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
+  empty: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
   },
-  flex: {
-    flex: 1,
-  },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: Spacing.three,
-    rowGap: Spacing.one,
-    marginTop: -Spacing.one,
-  },
-  legendItem: {
+  toggle: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.one + 2,
+    minHeight: 48,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  intro: {
-    gap: Spacing.one,
+  pressed: {
+    opacity: 0.6,
   },
   footnote: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.one,
   },
 });

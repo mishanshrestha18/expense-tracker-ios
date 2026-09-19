@@ -18,7 +18,7 @@ export function categoryIcon(key: string): IconName {
   return CATEGORY_ICONS[key] ?? CATEGORY_ICONS.other;
 }
 
-/** Coloured circle with the category's glyph. */
+/** The category's glyph on its colour, as a rounded square (like iOS Settings icons). */
 export function CategoryBadge({
   category,
   size = 36,
@@ -30,7 +30,12 @@ export function CategoryBadge({
     <View
       style={[
         styles.badge,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: category.color },
+        {
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.3),
+          backgroundColor: category.color,
+        },
       ]}>
       <Icon name={categoryIcon(category.icon)} size={size * 0.5} color="#FFFFFF" />
     </View>
@@ -41,5 +46,6 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: 'center',
     justifyContent: 'center',
+    borderCurve: 'continuous',
   },
 });

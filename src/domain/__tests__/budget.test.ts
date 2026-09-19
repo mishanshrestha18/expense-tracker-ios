@@ -1,6 +1,54 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { budgetOverview, budgetProgress, type BudgetStatus, dailyAllowancePence } from '../budget';
+import {
+  budgetOverview,
+  budgetPace,
+  budgetProgress,
+  type BudgetStatus,
+  dailyAllowancePence,
+} from '../budget';
+
+describe('budgetPace', () => {
+  // 19 September: 19 of 30 days gone.
+  const today = new Date(2026, 8, 19);
+  const limit = 160000;
+
+  it('is on track at or near a straight-line pace', () => {
+    const pace = budgetPace(89727, limit, '2026-09', today);
+    expect(pace.status).toBe('on-track');
+    expect(pace.monthElapsed).toBeCloseTo(19 / 30);
+    // Expected by now ≈ £1,013; the 10% cushion allows up to ≈ £1,173.
+    expect(budgetPace(117000, limit, '2026-09', today).status).toBe('on-track');
+  });
+
+  it('flags spending well ahead of pace', () => {
+    expect(budgetPace(120000, limit, '2026-09', today).status).toBe('fast');
+  });
+
+  it('reports going over the limit', () => {
+    expect(budgetPace(170000, limit, '2026-09', today).status).toBe('over');
+    expect(budgetPace(170000, limit, '2026-08', today)).toEqual({
+      status: 'over',
+      monthElapsed: null,
+    });
+  });
+
+  it('judges finished months against the whole limit', () => {
+    expect(budgetPace(150000, limit, '2026-08', today)).toEqual({
+      status: 'under',
+      monthElapsed: null,
+    });
+  });
+
+  it('treats future months as upcoming', () => {
+    expect(budgetPace(0, limit, '2026-10', today).status).toBe('upcoming');
+  });
+
+  it('does not panic over one early bill', () => {
+    // £150 on the 1st of a £1,600 month is within the cushion.
+    expect(budgetPace(15000, limit, '2026-09', new Date(2026, 8, 1)).status).toBe('on-track');
+  });
+});
 
 describe('budgetProgress', () => {
   it('reports no budget', () => {

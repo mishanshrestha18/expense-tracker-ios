@@ -18,6 +18,7 @@ export type ThemedTextProps = TextProps & {
     | 'smallBold'
     | 'amount'
     | 'amountLarge'
+    | 'display'
     | 'link'
     | 'linkPrimary'
     | 'code';
@@ -97,17 +98,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: 700,
   },
+  // Money uses SF Pro Rounded with tabular figures, as in Apple's Wallet and Fitness.
   amount: {
+    fontFamily: Fonts.rounded,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: 600,
     fontVariant: ['tabular-nums'],
   },
   amountLarge: {
+    fontFamily: Fonts.rounded,
     fontSize: 40,
     lineHeight: 46,
     fontWeight: 700,
     letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  display: {
+    fontFamily: Fonts.rounded,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: 700,
+    letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   },
   link: {
