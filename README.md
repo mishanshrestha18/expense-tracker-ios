@@ -21,6 +21,7 @@ Everything is stored on the device. No account, no server.
 - _"Hey Siri, can I afford it?"_ → _"That would put you £12 over for the rest of the month."_
 - _"Hey Siri, am I spending more than last month?"_ → _"£120 more than this time last month."_
 - _"Hey Siri, how much have I saved?"_ → _"£420 saved, and September is on course to add £181."_
+- Sunday, 6pm: _"£650 left for the rest of September. £121 more than this time last month."_
 
 ## Features
 
@@ -64,6 +65,20 @@ Everything is stored on the device. No account, no server.
   free, and tells you a week before a price you already know about goes up.
 - **Savings that keep score** — whatever a period ends under its budget rolls into savings, an
   overspend comes back out of it, and the tab says what the period in hand is on course to add.
+- **Goals** — name what the savings are for. They fill from the top, and each one says when it
+  will be met at the rate you actually save.
+- **Search** — by shop, category, amount, cash or card, or a date range: "£452.82 · 8 payments ·
+  £56.60 each" answers what Tesco really costs.
+- **Envelope budgeting, optionally** — a category that ends under its limit hands the difference
+  to the next period, and an overspend is taken off it.
+- **The month in one card** — a shareable picture of the period: what was spent, what was saved,
+  and the categories that moved.
+- **Home Screen and Lock Screen widget** — "£41 left for September" at a glance
+  ([how to build it](docs/install-on-iphone.md)).
+- **In iOS search** — type "Pret" in Spotlight and the payment is there.
+- **Reminders that do something** — a bill due today comes with a **Paid** button, and Sunday
+  evening brings one summary: what is left, how it compares with last month, what savings gain.
+- **Backup and restore** — the whole app in one JSON file, out to Files and back again.
 - **Your data leaves whenever you like** — export every expense as CSV from Settings.
 
 ## Tech stack
@@ -79,6 +94,7 @@ Everything is stored on the device. No account, no server.
 | Quality    | ESLint (`eslint-config-expo`), Prettier and GitHub Actions CI                       |
 | Siri       | Swift App Intents compiled into the app target via Expo inline modules              |
 | iOS builds | IPA built on a GitHub-hosted Mac, installed with Sideloadly — no Mac needed         |
+| Widget     | A WidgetKit target in `targets/`, built with `@bacons/apple-targets` (opt-in)       |
 
 ## Architecture
 
@@ -104,6 +120,8 @@ src/
 ├── db/           Schema, migrations and repositories
 ├── hooks/        Data hooks built on useDbQuery / useDbMutation
 ├── savings/      Closing a finished period into the savings pot
+├── spotlight/    What iOS search knows about the expenses
+├── widget/       The figures the Home Screen widget reads
 ├── siri/         The App Intents bridge: inbox import and the budget summary
 ├── state/        App-wide context: selected period, data version
 └── test-utils/   In-memory SQLite for tests
@@ -168,6 +186,8 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 - [x] **Committed costs** — bills with future price changes, a committed/everyday split, and
       reminders ([design](docs/design/committed-costs.md)).
 - [x] **Savings** — finished periods roll their leftover in, overspends come back out.
+- [x] **Goals, search, envelope budgeting, backup and restore.**
+- [x] **Widget, Spotlight, the Sunday round-up and a Paid button on bill reminders.**
 - [ ] **Screenshots and a 20-second demo clip** — see [docs/demo/SHOT-LIST.md](docs/demo/SHOT-LIST.md).
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).

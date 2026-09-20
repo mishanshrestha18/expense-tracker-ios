@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { CategoryBadge } from '@/components/category-badge';
@@ -8,6 +9,7 @@ import { MonthSwitcher } from '@/components/month-switcher';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
@@ -39,6 +41,7 @@ const TREND_PERIODS = 6;
 
 export default function InsightsScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { month, setMonth, rule, period, isCurrent } = useSelectedPeriod();
   const { categories } = useCategories();
   const spending = usePeriodSpending(period).data ?? [];
@@ -83,6 +86,13 @@ export default function InsightsScreen() {
         isCurrent={isCurrent}
         noun={noun}
         onChange={setMonth}
+        accessory={
+          <IconButton
+            icon={{ ios: 'square.and.arrow.up', material: 'share' }}
+            label="Share this month as a card"
+            onPress={() => router.push('/wrapped')}
+          />
+        }
       />
 
       {totalPence === 0 ? (

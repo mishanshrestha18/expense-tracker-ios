@@ -6,17 +6,21 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { PressableScale } from '@/components/ui/pressable-scale';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type Theme } from '@/constants/theme';
 import type { SavingsEntry } from '@/db/types';
 import { budgetOverview } from '@/domain/budget';
-import { formatDate, formatMonthName } from '@/domain/dates';
+import { formatDate, formatMonth, formatMonthName, monthKeyOf } from '@/domain/dates';
+import { allocateGoals, averageCarryPence, type GoalProgress } from '@/domain/goals';
 import { formatPence } from '@/domain/money';
 import { periodNoun } from '@/domain/period';
 import { carryPence, type SavingsSummary } from '@/domain/savings';
 import { useBudgets, useOverallBudget, usePeriodSpending } from '@/hooks/use-app-data';
 import { usePeriodCommitments } from '@/hooks/use-commitments';
+import { useGoals } from '@/hooks/use-goals';
 import { useSavings } from '@/hooks/use-savings';
 import { useTheme } from '@/hooks/use-theme';
 import { useSelectedPeriod } from '@/state/period';
@@ -26,6 +30,7 @@ export default function SavingsScreen() {
   const router = useRouter();
   const { month, rule, period, isCurrent } = useSelectedPeriod();
   const { entries, summary, loaded } = useSavings();
+  const { goals, loaded: goalsLoaded } = useGoals();
 
   const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
@@ -36,6 +41,9 @@ export default function SavingsScreen() {
   const noun = periodNoun(rule);
   // What this period is on course to add, before it is closed for good.
   const onCourse = carryPence(overview.monthlyLimitPence, overview.totalSpentPence);
+  // The balance shared out over the goals, at the rate recent periods have saved.
+  const goalProgress = allocateGoals(goals, summary.balancePence, averageCarryPence(entries));
+  const savedCount = goalProgress.filter((progress) => progress.done).length;
 
   return (
     <Screen>
@@ -104,6 +112,48 @@ export default function SavingsScreen() {
         </Card>
       ) : null}
 
+      {goalsLoaded ? (
+        <Section
+          title="Goals"
+          detail={
+            goalProgress.length > 0 ? `${savedCount} of ${goalProgress.length} saved` : undefined
+          }>
+          {goalProgress.length === 0 ? (
+            <Card style={styles.goalsEmpty}>
+              <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
+                Give the balance a job: a trip, a new laptop, a rainy day. Goals fill from the top,
+                and I’ll say when each one is met at the rate you save.
+              </ThemedText>
+              <Button
+                title="Add a goal"
+                variant="secondary"
+                icon={{ ios: 'plus', material: 'add' }}
+                onPress={() => router.push('/savings/goal')}
+              />
+            </Card>
+          ) : (
+            <View style={styles.goals}>
+              <Card flush>
+                {goalProgress.map((progress, index) => (
+                  <GoalRow
+                    key={progress.goal.id}
+                    progress={progress}
+                    showSeparator={index < goalProgress.length - 1}
+                    onPress={() => router.push(`/savings/goal?id=${progress.goal.id}`)}
+                  />
+                ))}
+              </Card>
+              <Button
+                title="Add another goal"
+                variant="secondary"
+                icon={{ ios: 'plus', material: 'add' }}
+                onPress={() => router.push('/savings/goal')}
+              />
+            </View>
+          )}
+        </Section>
+      ) : null}
+
       {entries.length === 0 ? (
         loaded ? (
           <EmptyState
@@ -146,6 +196,94 @@ function balanceLine(summary: SavingsSummary, noun: string): string {
   }
   const closed = `${summary.periodsCounted} closed ${summary.periodsCounted === 1 ? noun : `${noun}s`}`;
   return byHand ? `From ${closed}, plus ${byHand}.` : `From ${closed}.`;
+}
+
+type Tone = 'good' | 'warning' | 'neutral';
+
+/** The tone's ink and the wash behind it, picked the way the budget hero picks them. */
+function toneColors(theme: Theme, tone: Tone) {
+  if (tone === 'warning') return { ink: theme.warningFill, wash: theme.warningSoft };
+  if (tone === 'good') return { ink: theme.tint, wash: theme.tintSoft };
+  return { ink: theme.textSecondary, wash: theme.backgroundElement };
+}
+
+/** What a goal is waiting on, in a line: when it lands, or what is still to go. */
+function goalStatus({ goal, remainingPence, done, etaLabel, behind }: GoalProgress): string {
+  const wanted = goal.targetDate === null ? null : formatMonth(monthKeyOf(goal.targetDate));
+  if (done) return 'Saved';
+  if (etaLabel === null) {
+    const left = `${formatPence(remainingPence)} to go`;
+    return wanted === null ? left : `${left}, wanted by ${wanted}`;
+  }
+  return behind && wanted !== null
+    ? `Not until ${etaLabel}, past ${wanted}`
+    : `On course for ${etaLabel}`;
+}
+
+/** One goal: what the balance covers of it, how far along, and when it is met. */
+function GoalRow({
+  progress,
+  showSeparator,
+  onPress,
+}: {
+  progress: GoalProgress;
+  showSeparator: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const { goal, allocatedPence, ratio, done, behind } = progress;
+  const { ink, wash } = toneColors(theme, done ? 'good' : behind ? 'warning' : 'neutral');
+  const amounts = `${formatPence(allocatedPence)} of ${formatPence(goal.targetPence)}`;
+  const status = goalStatus(progress);
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={`${goal.name}: ${amounts}. ${status}`}
+      accessibilityHint="Opens this goal"
+      onPress={onPress}
+      pressedScale={0.98}
+      style={styles.goalRow}>
+      <View style={[styles.dot, { backgroundColor: wash }]}>
+        <Icon
+          name={
+            done ? { ios: 'checkmark', material: 'check' } : { ios: 'flag.fill', material: 'flag' }
+          }
+          size={14}
+          color={ink}
+        />
+      </View>
+      <View
+        style={[
+          styles.goalBody,
+          showSeparator && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.separator,
+          },
+        ]}>
+        <ThemedText type="headline" numberOfLines={1}>
+          {goal.name}
+        </ThemedText>
+        <ThemedText type="amount">{amounts}</ThemedText>
+        <ProgressBar ratio={ratio} status={behind ? 'warning' : 'ok'} height={6} />
+        <View style={styles.goalStatus}>
+          {behind ? (
+            <Icon
+              name={{ ios: 'exclamationmark.circle.fill', material: 'error' }}
+              size={12}
+              color={ink}
+            />
+          ) : null}
+          <ThemedText
+            type="footnote"
+            numberOfLines={1}
+            style={{ color: done || behind ? ink : theme.textSecondary }}>
+            {status}
+          </ThemedText>
+        </View>
+      </View>
+    </PressableScale>
+  );
 }
 
 function EntryRow({
@@ -201,6 +339,35 @@ function EntryRow({
 }
 
 const styles = StyleSheet.create({
+  goals: {
+    gap: Spacing.two,
+  },
+  goalsEmpty: {
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.four,
+  },
+  centered: {
+    textAlign: 'center',
+  },
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - 4,
+    paddingLeft: Spacing.three,
+  },
+  goalBody: {
+    flex: 1,
+    gap: Spacing.one + 2,
+    minHeight: 60,
+    paddingVertical: Spacing.three - 4,
+    paddingRight: Spacing.three,
+  },
+  goalStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   header: {
     gap: 2,
   },

@@ -6,6 +6,14 @@ name: iOS build
 #   gh workflow run ios-build.yml
 on:
   workflow_dispatch:
+    inputs:
+      widget:
+        description: >-
+          Also build the Home Screen widget. It needs an App Group, which a free
+          Apple ID may not be allowed to sign, so leave this off if Sideloadly
+          starts refusing the build.
+        type: boolean
+        default: false
   push:
     # Also build every release tag, e.g. `git tag v1.0 && git push --tags`.
     tags: ['v*']
@@ -36,6 +44,7 @@ jobs:
         run: npx expo prebuild --platform ios --clean
         env:
           CI: 1
+          EXPENSES_WIDGET: ${{ inputs.widget && '1' || '0' }}
 
       - name: Build (unsigned)
         run: |
@@ -68,6 +77,17 @@ jobs:
           xattr -cr "$APP"
           for FRAMEWORK in "$APP"/Frameworks/*.framework; do
             codesign --force --sign - --timestamp=none "$FRAMEWORK"
+          done
+          # An app extension (the widget) is signed from the inside out too, and
+          # before the app that contains it.
+          for APPEX in "$APP"/PlugIns/*.appex; do
+            [ -e "$APPEX" ] || continue
+            echo "Signing extension: $(basename "$APPEX")"
+            for FRAMEWORK in "$APPEX"/Frameworks/*.framework; do
+              [ -e "$FRAMEWORK" ] || continue
+              codesign --force --sign - --timestamp=none "$FRAMEWORK"
+            done
+            codesign --force --sign - --timestamp=none "$APPEX"
           done
           codesign --force --sign - --timestamp=none "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"

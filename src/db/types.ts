@@ -102,6 +102,35 @@ export interface SavingsEntry {
   createdAt: string;
 }
 
+/**
+ * What the savings are being kept for. Goals are filled from the savings
+ * balance in order: the first goal takes what it needs, the next takes what is
+ * left, so nothing has to be moved between pots by hand.
+ */
+export interface SavingsGoal {
+  id: number;
+  name: string;
+  targetPence: number;
+  /** When the money is wanted for, `YYYY-MM-DD`; `null` for "no rush". */
+  targetDate: IsoDate | null;
+  note: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export type SavingsGoalInput = Pick<SavingsGoal, 'name' | 'targetPence' | 'targetDate' | 'note'>;
+
+/**
+ * What one category has carried into the period after `periodKey`, signed and
+ * cumulative: last period's carry plus this period's limit, less what was
+ * spent. Only written when envelope budgeting is switched on.
+ */
+export interface CategoryCarry {
+  categoryId: number;
+  periodKey: MonthKey;
+  amountPence: number;
+}
+
 /** What happened to one occurrence of a commitment. */
 export interface CommitmentSettlement {
   commitmentId: number;

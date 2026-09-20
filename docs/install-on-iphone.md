@@ -125,6 +125,26 @@ as a spreadsheet.
 iOS only sees payments made with Apple Pay on the iPhone. Tapping a physical card
 doesn't involve the phone, so those payments can't be added automatically.
 
+## The Home Screen widget (optional, and it may not sign)
+
+The widget shows "£41 left for September" on the Home Screen and the Lock
+Screen. It is a separate app extension, and it reads the figures through an
+**App Group** — a capability Apple does not always grant a free Apple ID. That
+is why it is off by default: the install that works cannot be broken by a widget
+that will not sign.
+
+To try it:
+
+1. Run the **iOS build** workflow with **Also build the Home Screen widget**
+   ticked (`gh workflow run ios-build.yml -f widget=true`).
+2. Install the `.ipa` as usual.
+3. If Sideloadly finishes, long-press the Home Screen → **Edit** → **Add Widget**
+   → **Expenses**. Open the app once so the widget has something to show.
+
+If Sideloadly refuses it — an entitlement or provisioning error mentioning
+application groups — build again without the tick and carry on; nothing else in
+the app depends on it.
+
 ## Every 7 days
 
 Free installs stop opening after 7 days. Connect the phone and press **Start**
@@ -137,5 +157,7 @@ its data.
 
 - Installs last 7 days (above).
 - At most 3 sideloaded apps on the phone at once.
+- App Groups may not be signable, which is what the Home Screen widget needs
+  (above).
 - The single-sentence Siri command ("Hey Siri, add £285 to my Groceries list in
   Expenses") needs a build made with Xcode 27, which Expo supports from SDK 58.

@@ -4,6 +4,7 @@ import type { Db } from '@/db/types';
 import type { PaydayRule } from '@/domain/period';
 
 import { setAlerts } from '@/native/expenses-native';
+import { publishWidget } from '@/widget/publish';
 
 import { alertsFor, readBudgetSnapshot } from './budget-snapshot';
 
@@ -24,6 +25,10 @@ export async function publishBudgetSnapshot(
   if (!file.exists) file.create({ overwrite: true });
   file.write(JSON.stringify(snapshot));
 
-  // Bills, price changes and the payday nudge, rebooked whenever anything moves.
+  // Bills, price changes, the payday nudge and the Sunday summary, rebooked
+  // whenever anything moves.
   await setAlerts(alertsFor(snapshot));
+
+  // The Home Screen and Lock Screen widget, when one was built.
+  publishWidget(snapshot);
 }

@@ -86,6 +86,11 @@ export default function OverviewScreen() {
         accessory={
           <>
             <IconButton
+              icon={{ ios: 'magnifyingglass', material: 'search' }}
+              label="Search expenses"
+              onPress={() => router.push('/search')}
+            />
+            <IconButton
               icon={{ ios: 'gearshape', material: 'settings' }}
               label="Settings"
               onPress={() => router.push('/settings')}

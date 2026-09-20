@@ -11,7 +11,7 @@ import { listExpensesBetween, spendingByCategoryBetween, totalBetween } from '@/
 import { listMerchantRules, type MerchantRule } from '@/db/merchant-rules';
 import { listSavingsEntries } from '@/db/savings';
 import { listIgnoredRecurring } from '@/db/recurring';
-import { getPaymentAlerts } from '@/db/settings';
+import { getPaymentAlerts, getWeeklyReview } from '@/db/settings';
 import type { Category, Commitment, Db, Expense } from '@/db/types';
 import { type CategorySpend, forecast } from '@/domain/budget';
 import {
@@ -44,6 +44,7 @@ import {
   samePointLastYear,
 } from '@/domain/period';
 import { phraseWords } from '@/domain/quick-add';
+import { describeChange } from '@/domain/compare';
 import { detectRecurring, totalUpcomingPence, upcomingFees } from '@/domain/recurring';
 import { summariseSavings } from '@/domain/savings';
 
@@ -69,6 +70,8 @@ export interface SnapshotChange {
 }
 
 export interface SnapshotBill {
+  /** The commitment it settles, so a notification can mark it paid. */
+  commitmentId: number;
   name: string;
   dueOn: IsoDate;
   amountPence: number;
@@ -116,6 +119,8 @@ export interface BudgetSnapshot {
   bills: SnapshotBill[];
   /** What finished periods have rolled into savings, plus anything moved by hand. */
   savingsBalancePence: number;
+  /** Whether the Sunday evening summary is wanted. */
+  weeklyReview: boolean;
   /** Price changes already pencilled in, soonest first. */
   changes: SnapshotChange[];
   categories: SnapshotCategory[];
@@ -138,6 +143,7 @@ interface SnapshotInput {
   bills: SnapshotBill[];
   changes: SnapshotChange[];
   savingsBalancePence: number;
+  weeklyReview: boolean;
   today: Date;
 }
 
@@ -165,6 +171,7 @@ export function buildSnapshot({
   bills,
   changes,
   savingsBalancePence,
+  weeklyReview,
   today,
 }: SnapshotInput): BudgetSnapshot {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
@@ -206,6 +213,7 @@ export function buildSnapshot({
     bills,
     changes,
     savingsBalancePence,
+    weeklyReview,
     everydayLimitPence:
       monthlyLimitPence === null
         ? null
@@ -257,6 +265,66 @@ export function forecastNudge(snapshot: BudgetSnapshot): BudgetNudge | null {
   return { body: `On pace to finish ${formatPence(over)} over${fees}.`, at };
 }
 
+/** Sunday, early evening: late enough to be home, early enough to matter. */
+const REVIEW_DAY = 0;
+const REVIEW_HOUR = 18;
+
+/** What is genuinely left to spend, preferring the everyday money over the whole budget. */
+export function remainingPence(snapshot: BudgetSnapshot): number | null {
+  if (snapshot.monthlyLimitPence === null) return null;
+  if (
+    snapshot.everydayLimitPence !== null &&
+    snapshot.everydayLimitPence < snapshot.monthlyLimitPence
+  ) {
+    return snapshot.everydayLimitPence - (snapshot.everydaySpentPence ?? snapshot.spentPence);
+  }
+  return snapshot.monthlyLimitPence - snapshot.spentPence;
+}
+
+/**
+ * The Sunday summary: where the money is, how it compares with the period
+ * before, and what the savings stand to gain. One notification a week, and
+ * only while the period it talks about is still running.
+ */
+export function weeklyReviewNudge(snapshot: BudgetSnapshot): BudgetNudge | null {
+  if (!snapshot.paymentAlerts || !snapshot.weeklyReview) return null;
+
+  const now = Date.parse(snapshot.generatedAt);
+  const at = new Date(now);
+  at.setHours(REVIEW_HOUR, 0, 0, 0);
+  at.setDate(at.getDate() + ((REVIEW_DAY - at.getDay() + 7) % 7));
+  if (at.getTime() <= now) at.setDate(at.getDate() + 7);
+  // Once the period is over the wrap-up says all this better.
+  if (toIsoDate(at) >= snapshot.period.end) return null;
+
+  const parts: string[] = [];
+  const left = remainingPence(snapshot);
+  if (left === null) {
+    parts.push(`${formatPence(snapshot.spentPence)} spent so far this ${snapshot.noun}`);
+  } else if (left >= 0) {
+    parts.push(`${formatPence(left)} left for the rest of ${snapshot.period.label}`);
+  } else {
+    parts.push(`${formatPence(-left)} over for ${snapshot.period.label}`);
+  }
+
+  if (snapshot.lastPeriodPence !== null) {
+    parts.push(
+      describeChange(
+        snapshot.spentPence - snapshot.lastPeriodPence,
+        `this time last ${snapshot.noun}`,
+      ),
+    );
+  }
+
+  if (snapshot.monthlyLimitPence !== null) {
+    const carry = snapshot.monthlyLimitPence - snapshot.spentPence;
+    if (carry > 0) parts.push(`${formatPence(carry)} headed to savings`);
+    else if (carry < 0) parts.push(`${formatPence(-carry)} coming out of savings`);
+  }
+
+  return { body: `${parts.join('. ')}.`, at };
+}
+
 /** The hour bills and changes are announced at. */
 const BILL_ALERT_HOUR = 9;
 const CHANGE_ALERT_HOUR = 10;
@@ -277,10 +345,11 @@ export function alertsFor(snapshot: BudgetSnapshot): ScheduledAlert[] {
     const at = fromIsoDate(bill.dueOn);
     at.setHours(BILL_ALERT_HOUR, 0, 0, 0);
     alerts.push({
-      id: `bill-${bill.name}-${bill.dueOn}`,
+      id: `bill-${bill.commitmentId}-${bill.dueOn}`,
       title: 'Bill due today',
       body: `${bill.name}, ${formatPence(bill.amountPence)}.`,
       at,
+      bill: { commitmentId: bill.commitmentId, dueOn: bill.dueOn },
     });
   }
 
@@ -299,6 +368,9 @@ export function alertsFor(snapshot: BudgetSnapshot): ScheduledAlert[] {
 
   const nudge = forecastNudge(snapshot);
   if (nudge) alerts.push({ id: 'forecast', title: 'Before payday', ...nudge });
+
+  const review = weeklyReviewNudge(snapshot);
+  if (review) alerts.push({ id: 'weekly-review', title: 'Your week', ...review });
 
   return alerts
     .filter((alert) => alert.at.getTime() > now)
@@ -340,6 +412,7 @@ export async function readBudgetSnapshot(
     spending,
     ignored,
     paymentAlerts,
+    weeklyReviewOn,
     rules,
     commitments,
     settlements,
@@ -351,6 +424,7 @@ export async function readBudgetSnapshot(
     spendingByCategoryBetween(db, period.start, period.end),
     listIgnoredRecurring(db),
     getPaymentAlerts(db),
+    getWeeklyReview(db),
     listMerchantRules(db),
     listCommitments(db),
     listSettlements(db, period.start, period.end),
@@ -364,6 +438,7 @@ export async function readBudgetSnapshot(
     .filter((o) => o.status !== 'paid' && o.status !== 'skipped')
     .slice(0, 8)
     .map((o) => ({
+      commitmentId: o.commitmentId,
       name: nameOf.get(o.commitmentId) ?? 'Bill',
       dueOn: o.dueOn,
       amountPence: o.amountPence,
@@ -404,6 +479,7 @@ export async function readBudgetSnapshot(
     bills,
     changes,
     savingsBalancePence: summariseSavings(savingsEntries).balancePence,
+    weeklyReview: weeklyReviewOn,
     today,
   });
 }

@@ -244,4 +244,33 @@ export const MIGRATIONS: readonly string[] = [
 
   CREATE UNIQUE INDEX savings_carry_period ON savings_entries (period_key) WHERE kind = 'carry';
   `,
+
+  // v7: what the savings are for. Goals are filled from the one savings
+  // balance in `sort_order`, so there is no second ledger to keep in step:
+  // the first goal fills first, and what is left flows to the next.
+  `
+  CREATE TABLE savings_goals (
+    id           INTEGER PRIMARY KEY NOT NULL,
+    name         TEXT    NOT NULL,
+    target_pence INTEGER NOT NULL CHECK (target_pence > 0),
+    target_date  TEXT,
+    note         TEXT    NOT NULL DEFAULT '',
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  `,
+
+  // v8: envelope budgeting. A category that finishes a period under its limit
+  // hands the difference to the next one, and an overspend is taken off it.
+  // `amount_pence` is signed and cumulative: it is everything the category has
+  // carried up to the end of `period_key`, so the chain survives a gap.
+  `
+  CREATE TABLE category_carry (
+    category_id  INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+    period_key   TEXT    NOT NULL,
+    amount_pence INTEGER NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (category_id, period_key)
+  );
+  `,
 ];

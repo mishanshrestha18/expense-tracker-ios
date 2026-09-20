@@ -5,11 +5,22 @@
  */
 import { requireOptionalNativeModule } from 'expo';
 
+import type { IsoDate } from '@/domain/dates';
+
 interface ExpensesNativeModule {
   /** Asks for permission to post "payment added" notifications. */
   requestNotificationPermission(): Promise<boolean>;
   /** Replaces the whole reminder schedule. */
-  setAlerts(alerts: { id: string; title: string; body: string; at: number }[]): Promise<boolean>;
+  setAlerts(
+    alerts: {
+      id: string;
+      title: string;
+      body: string;
+      at: number;
+      billId: number;
+      billDueOn: string;
+    }[],
+  ): Promise<boolean>;
 }
 
 export interface ScheduledAlert {
@@ -17,6 +28,11 @@ export interface ScheduledAlert {
   title: string;
   body: string;
   at: Date;
+  /**
+   * The bill this reminder is about. Reminders that have one grow a "Paid"
+   * button, so a bill can be settled without opening the app.
+   */
+  bill?: { commitmentId: number; dueOn: IsoDate };
 }
 
 const native = requireOptionalNativeModule<ExpensesNativeModule>('ExpensesNative');
@@ -28,6 +44,13 @@ export async function requestPaymentAlerts(): Promise<boolean> {
 /** Books every reminder the app wants, and cancels anything it booked before. */
 export async function setAlerts(alerts: readonly ScheduledAlert[]): Promise<void> {
   await native?.setAlerts(
-    alerts.map((alert) => ({ ...alert, at: Math.floor(alert.at.getTime() / 1000) })),
+    alerts.map((alert) => ({
+      id: alert.id,
+      title: alert.title,
+      body: alert.body,
+      at: Math.floor(alert.at.getTime() / 1000),
+      billId: alert.bill?.commitmentId ?? 0,
+      billDueOn: alert.bill?.dueOn ?? '',
+    })),
   );
 }

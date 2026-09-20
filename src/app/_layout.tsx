@@ -65,6 +65,8 @@ export default function RootLayout() {
                 headerTitleStyle: { color: colors.text },
               }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="search" options={{ title: 'Search' }} />
+              <Stack.Screen name="wrapped" options={{ title: 'The month in one card' }} />
               <Stack.Screen
                 name="expense/new"
                 options={{
@@ -94,6 +96,14 @@ export default function RootLayout() {
                 options={{
                   presentation: 'modal',
                   title: 'Move money',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
+                name="savings/goal"
+                options={{
+                  presentation: 'modal',
+                  title: 'Goal',
                   headerLeft: HeaderCancelButton,
                 }}
               />

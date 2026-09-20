@@ -22,6 +22,7 @@ import {
   safeToSpendPence,
 } from '@/domain/budget';
 import { formatMonthName } from '@/domain/dates';
+import { describeCarry, envelopeLimit } from '@/domain/envelopes';
 import { formatPence } from '@/domain/money';
 import {
   daysInPeriod,
@@ -36,6 +37,7 @@ import {
   usePeriodSpending,
 } from '@/hooks/use-app-data';
 import { usePeriodCommitments } from '@/hooks/use-commitments';
+import { useEnvelopes } from '@/hooks/use-envelopes';
 import { useUpcomingFees } from '@/hooks/use-recurring';
 import { useTheme } from '@/hooks/use-theme';
 import { useSelectedPeriod } from '@/state/period';
@@ -44,7 +46,10 @@ import { UpcomingFees } from '@/components/upcoming-fees';
 interface CategoryLine {
   category: Category;
   spentPence: number;
+  /** The envelope limit while envelope budgeting is on, otherwise the budget itself. */
   limitPence: number | null;
+  /** Signed pence brought in from the period before; 0 unless envelopes are on. */
+  carriedInPence: number;
 }
 
 export default function BudgetsScreen() {
@@ -55,6 +60,7 @@ export default function BudgetsScreen() {
   const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
+  const envelopes = useEnvelopes(period.key, rule);
   const bills = usePeriodCommitments(period);
   const upcoming = useUpcomingFees(period, bills.commitments);
   const [showIdle, setShowIdle] = useState(false);
@@ -83,12 +89,19 @@ export default function BudgetsScreen() {
   const totalSpent = overview.totalSpentPence;
 
   // Biggest spending first; categories with nothing spent keep their usual order.
+  // With envelopes on, a limit is money the category keeps: what it did not
+  // spend last period is still in it, and an overspend is a debt to pay off.
   const lines: CategoryLine[] = categories
-    .map((category) => ({
-      category,
-      spentPence: spentBy.get(category.id) ?? 0,
-      limitPence: limitBy.get(category.id) ?? null,
-    }))
+    .map((category) => {
+      const basePence = limitBy.get(category.id) ?? null;
+      const carriedInPence = envelopes.carriedIn.get(category.id) ?? 0;
+      return {
+        category,
+        spentPence: spentBy.get(category.id) ?? 0,
+        limitPence: envelopes.enabled ? envelopeLimit(basePence, carriedInPence) : basePence,
+        carriedInPence,
+      };
+    })
     .sort((a, b) => b.spentPence - a.spentPence);
   // Categories with no spending and no limit are tucked away until asked for.
   const idle = lines.filter((line) => line.spentPence === 0 && line.limitPence === null);
@@ -155,17 +168,29 @@ export default function BudgetsScreen() {
             </ThemedText>
           )}
 
-          {visible.map((line, index) => (
-            <BudgetRow
-              key={line.category.id}
-              category={line.category}
-              spentPence={line.spentPence}
-              limitPence={line.limitPence}
-              share={totalSpent > 0 ? line.spentPence / totalSpent : 0}
-              showSeparator={index < visible.length - 1 || idle.length > 0}
-              onPress={() => router.push(`/budget/${line.category.id}`)}
-            />
-          ))}
+          {visible.map((line, index) => {
+            const separator = index < visible.length - 1 || idle.length > 0;
+            const carry = describeCarry(line.carriedInPence, periodNoun(rule));
+            return (
+              <View key={line.category.id}>
+                <BudgetRow
+                  category={line.category}
+                  spentPence={line.spentPence}
+                  limitPence={line.limitPence}
+                  share={totalSpent > 0 ? line.spentPence / totalSpent : 0}
+                  showSeparator={carry === null && separator}
+                  onPress={() => router.push(`/budget/${line.category.id}`)}
+                />
+                {carry === null ? null : (
+                  <CarryNote
+                    text={carry}
+                    owed={line.carriedInPence < 0}
+                    showSeparator={separator}
+                  />
+                )}
+              </View>
+            );
+          })}
 
           {idle.length > 0 ? (
             <Pressable
@@ -194,6 +219,47 @@ export default function BudgetsScreen() {
 
       <Footnote overview={overview} />
     </Screen>
+  );
+}
+
+/**
+ * What a category brought into this period under envelope budgeting. The tint
+ * means money still sitting in the envelope and the warning ink means a debt to
+ * pay off first, the same pairing the hero uses for a good or a worrying period.
+ */
+function CarryNote({
+  text,
+  owed,
+  showSeparator,
+}: {
+  text: string;
+  owed: boolean;
+  showSeparator: boolean;
+}) {
+  const theme = useTheme();
+  const color = owed ? theme.warning : theme.tint;
+  return (
+    <View
+      style={[
+        styles.carry,
+        showSeparator && {
+          borderBottomColor: theme.separator,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+        },
+      ]}>
+      <Icon
+        name={
+          owed
+            ? { ios: 'arrow.down.right', material: 'trending_down' }
+            : { ios: 'arrow.up.right', material: 'trending_up' }
+        }
+        size={12}
+        color={color}
+      />
+      <ThemedText type="footnote" numberOfLines={1} style={{ color }}>
+        {text}
+      </ThemedText>
+    </View>
   );
 }
 
@@ -233,6 +299,16 @@ const styles = StyleSheet.create({
   empty: {
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
+  },
+  carry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    // Lines the note and its separator up with the row above, past the badge.
+    marginLeft: Spacing.three * 2 + 40 - 2,
+    marginTop: -Spacing.two,
+    paddingRight: Spacing.three,
+    paddingBottom: Spacing.three - 2,
   },
   toggle: {
     flexDirection: 'row',

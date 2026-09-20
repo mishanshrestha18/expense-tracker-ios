@@ -4,7 +4,13 @@ import { DEFAULT_CATEGORIES } from '@/db/schema';
 import type { Category } from '@/db/types';
 import { CALENDAR_MONTHS, type PaydayRule, periodFor } from '@/domain/period';
 
-import { alertsFor, buildSnapshot, forecastNudge, SNAPSHOT_VERSION } from '../budget-snapshot';
+import {
+  alertsFor,
+  buildSnapshot,
+  forecastNudge,
+  SNAPSHOT_VERSION,
+  weeklyReviewNudge,
+} from '../budget-snapshot';
 
 const categories: Category[] = DEFAULT_CATEGORIES.map((c, i) => ({
   id: i + 1,
@@ -40,8 +46,11 @@ const build = (rule: PaydayRule = CALENDAR_MONTHS) =>
       overduePence: 0,
       setAsidePence: 5000,
     },
-    bills: [{ name: 'Rent', dueOn: '2026-09-25', amountPence: 50000, overdue: false }],
+    bills: [
+      { commitmentId: 1, name: 'Rent', dueOn: '2026-09-25', amountPence: 50000, overdue: false },
+    ],
     savingsBalancePence: 0,
+    weeklyReview: false,
     changes: [{ name: 'Rent', effectiveFrom: '2026-10-01', fromPence: 50000, toPence: 70000 }],
     today: new Date(2026, 8, 19),
   });
@@ -159,8 +168,38 @@ describe('alertsFor', () => {
   it('leaves overdue bills to the red banner in the app', () => {
     const overdue = {
       ...build(),
-      bills: [{ name: 'Rent', dueOn: '2026-09-01', amountPence: 50000, overdue: true }],
+      bills: [
+        { commitmentId: 1, name: 'Rent', dueOn: '2026-09-01', amountPence: 50000, overdue: true },
+      ],
     };
     expect(alertsFor(overdue).some((a) => a.title === 'Bill due today')).toBe(false);
+  });
+});
+
+describe('weeklyReviewNudge', () => {
+  // The fixture is built on Saturday 19 September 2026.
+  const sunday = (snapshot = build()) => weeklyReviewNudge({ ...snapshot, weeklyReview: true });
+
+  it('books the coming Sunday evening', () => {
+    expect(sunday()?.at).toEqual(new Date(2026, 8, 20, 18, 0, 0, 0));
+  });
+
+  it('says what is left, how it compares, and what savings stand to gain', () => {
+    // £1,600 budget, £371 spent, £90 of bills due of which £50 is paid: the
+    // everyday money is what is quoted, the carry is the whole budget's.
+    expect(sunday()?.body).toBe(
+      '£650.00 left for the rest of September. £121 more than this time last month. £1,229.00 headed to savings.',
+    );
+  });
+
+  it('is quiet when the summary or notifications are turned off', () => {
+    expect(weeklyReviewNudge(build())).toBeNull();
+    expect(sunday({ ...build(), paymentAlerts: false })).toBeNull();
+  });
+
+  it('leaves the last Sunday of a period to the wrap-up', () => {
+    // A Sunday on or after the period ends belongs to the next period.
+    const ending = { ...build(), period: { ...build().period, end: '2026-09-20' } };
+    expect(sunday(ending)).toBeNull();
   });
 });

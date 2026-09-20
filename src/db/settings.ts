@@ -11,6 +11,8 @@ import type { Db } from './types';
 const PAYDAY_KEY = 'payday-rule';
 const PAYMENT_ALERTS_KEY = 'payment-alerts';
 const SAVINGS_ANCHOR_KEY = 'savings-anchor';
+const ENVELOPES_KEY = 'envelopes';
+const WEEKLY_REVIEW_KEY = 'weekly-review';
 
 export async function getSetting(db: Db, key: string): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>(
@@ -76,4 +78,26 @@ export async function getSavingsAnchor(db: Db): Promise<MonthKey | null> {
 
 export async function setSavingsAnchor(db: Db, periodKey: MonthKey): Promise<void> {
   await setSetting(db, SAVINGS_ANCHOR_KEY, periodKey);
+}
+
+/**
+ * Envelope budgeting: a category that ends a period under its limit hands the
+ * difference to the next one. Off unless asked for, because it changes what
+ * every category limit means.
+ */
+export async function getEnvelopes(db: Db): Promise<boolean> {
+  return (await getSetting(db, ENVELOPES_KEY)) === 'on';
+}
+
+export async function setEnvelopes(db: Db, enabled: boolean): Promise<void> {
+  await setSetting(db, ENVELOPES_KEY, enabled ? 'on' : 'off');
+}
+
+/** The Sunday evening summary. On unless turned off. */
+export async function getWeeklyReview(db: Db): Promise<boolean> {
+  return (await getSetting(db, WEEKLY_REVIEW_KEY)) !== 'off';
+}
+
+export async function setWeeklyReview(db: Db, enabled: boolean): Promise<void> {
+  await setSetting(db, WEEKLY_REVIEW_KEY, enabled ? 'on' : 'off');
 }
