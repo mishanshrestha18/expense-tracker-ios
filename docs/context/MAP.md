@@ -7,7 +7,7 @@ period live" or "what does Siri already answer" costs one file instead of
 thirty. Hard-won facts that are **not** in the code — Sideloadly, free-account
 limits, Expo quirks — live next door in [FACTS.md](FACTS.md).
 
-At least 0 tests across 30 suites (`it.each` expands
+At least 0 tests across 31 suites (`it.each` expands
 into more; `npm test` prints the real number). 16 screens,
 8 migrations.
 
@@ -73,6 +73,7 @@ maths in a screen.
 | `savings.ts`        | `carryPence`, `summariseSavings`, `periodsToClose`                                                                                                                                                                                                                                       |
 | `search.ts`         | `isEmptyFilter`, `describeFilter`, `summariseResult`                                                                                                                                                                                                                                     |
 | `summary.ts`        | `bucketByPeriod`, `breakdown`, `percentChange`, `averageOfActiveMonths`, `groupByDay`                                                                                                                                                                                                    |
+| `tabs.ts`           | `tabIndexOf`, `neighbourTab`                                                                                                                                                                                                                                                             |
 | `type-scale.ts`     | `ringAmountSize`, `ringAmountStyle`                                                                                                                                                                                                                                                      |
 | `wrapped.ts`        | `buildWrapped`, `wrappedText`                                                                                                                                                                                                                                                            |
 
