@@ -70,8 +70,14 @@ month." and the expense appears the next time you open the app.
 
 Say a whole sentence instead:
 
-- "Hey Siri, quick add in my expenses" → "What did you spend?" → "forty quid
-  petrol and three pounds fifty on coffee"
+- "Hey Siri, tell my expenses what I spent" → "What did you spend?" → "forty
+  quid petrol and three pounds fifty on coffee"
+
+"Note a spend in my expenses" and "quick add in my expenses" do the same thing.
+Phrases that start with "add" sometimes make Siri ask whether you meant Wallet;
+if that happens, use one of the others, or make a personal shortcut named
+something short like "Spent" (Shortcuts → **+** → **Quick Add** → rename it),
+which Siri never confuses.
 
 On an iPhone with Apple Intelligence that is read on the phone itself and
 answered straight away. On other iPhones it is stored as you said it and read

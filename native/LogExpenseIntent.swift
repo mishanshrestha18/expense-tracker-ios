@@ -333,12 +333,15 @@ struct ExpensesShortcuts: AppShortcutsProvider {
         "New expense in \(.applicationName)",
       ]
     )
+    // Phrases starting with "add" clash with Wallet, and Siri then asks which
+    // app was meant, so the everyday ones here avoid that word.
     AppShortcut(
       intent: QuickAddIntent(),
       phrases: [
+        "Tell \(.applicationName) what I spent",
+        "Note a spend in \(.applicationName)",
+        "New spend in \(.applicationName)",
         "Quick add in \(.applicationName)",
-        "Quick add to \(.applicationName)",
-        "I spent money in \(.applicationName)",
       ]
     )
     AppShortcut(
