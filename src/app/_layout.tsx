@@ -1,4 +1,9 @@
 import {
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_700Bold,
+  useFonts,
+} from '@expo-google-fonts/space-grotesk';
+import {
   DarkTheme,
   DefaultTheme,
   type ErrorBoundaryProps,
@@ -27,6 +32,7 @@ void SplashScreen.preventAutoHideAsync();
 const DATABASE_NAME = 'expenses.db';
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ SpaceGrotesk_500Medium, SpaceGrotesk_700Bold });
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -41,6 +47,10 @@ export default function RootLayout() {
       border: colors.separator,
     },
   };
+
+  // The splash screen stays up until the display face is ready, so no screen
+  // ever paints its amounts twice.
+  if (!fontsLoaded) return null;
 
   return (
     <ThemeProvider value={navigationTheme}>

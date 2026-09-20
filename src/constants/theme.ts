@@ -24,26 +24,30 @@ export const Colors = {
     warning: '#B54708',
     /** Warning fills such as progress bars, where brightness matters more than text contrast. */
     warningFill: '#F79009',
+    /** Quiet amber wash behind a warning. */
+    warningSoft: '#FDF0E3',
     danger: '#D92D20',
     /** Quiet red wash behind an alert, so the red text still reads. */
     dangerFill: '#FEE4E2',
   },
   dark: {
-    text: '#FFFFFF',
-    textSecondary: '#98989F',
-    textTertiary: '#636366',
-    background: '#000000',
-    card: '#1C1C1E',
-    backgroundElement: '#2C2C2E',
-    backgroundSelected: '#3A3A3C',
-    separator: '#38383A',
+    text: '#F4F6F5',
+    textSecondary: '#9AA8A1',
+    textTertiary: '#6C7C75',
+    /** A green-black, so the emerald reads as the same family rather than a sticker. */
+    background: '#0A0D0B',
+    card: '#131A16',
+    backgroundElement: '#1B241E',
+    backgroundSelected: '#22302A',
+    separator: '#22302A',
     tint: '#34D399',
-    tintSoft: '#0B3B2C',
+    tintSoft: '#14312A',
     onTint: '#04241A',
-    warning: '#FFB340',
-    warningFill: '#FFB340',
-    danger: '#FF6961',
-    dangerFill: '#3A1512',
+    warning: '#FBBF24',
+    warningFill: '#F59E0B',
+    warningSoft: '#2E2108',
+    danger: '#FCA5A5',
+    dangerFill: '#2B1412',
   },
 } as const;
 
@@ -51,30 +55,13 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 export type Theme = { [K in ThemeColor]: string };
 
 /**
- * Gradient hero cards, shared by light and dark mode. Every stop keeps white
- * text above 4.5:1 contrast.
+ * Space Grotesk carries the headings and every amount: geometric, a little
+ * mechanical, and unmistakable next to the system face the body text uses.
  */
-export const HeroGradients = {
-  good: ['#064E3B', '#047857'],
-  warning: ['#78350F', '#B45309'],
-  danger: ['#7F1D1D', '#B91C1C'],
+export const DisplayFont = {
+  bold: 'SpaceGrotesk_700Bold',
+  medium: 'SpaceGrotesk_500Medium',
 } as const;
-
-export type HeroTone = keyof typeof HeroGradients;
-
-/** Foreground colours for content placed on a hero gradient. */
-export const OnHero = {
-  text: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.78)',
-  track: 'rgba(255, 255, 255, 0.22)',
-  surface: 'rgba(255, 255, 255, 0.16)',
-  divider: 'rgba(255, 255, 255, 0.2)',
-} as const;
-
-export function heroGradient(tone: HeroTone): string {
-  const [from, to] = HeroGradients[tone];
-  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
-}
 
 export const Fonts = Platform.select({
   ios: {
@@ -112,8 +99,8 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
-  control: 12,
-  card: 18,
+  control: 14,
+  card: 22,
   pill: 999,
 } as const;
 

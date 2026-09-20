@@ -53,7 +53,8 @@
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "./plugins/with-weak-frameworks",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

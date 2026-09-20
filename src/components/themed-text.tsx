@@ -1,6 +1,6 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { DisplayFont, Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
@@ -48,20 +48,22 @@ const styles = StyleSheet.create({
     fontWeight: 400,
   },
   largeTitle: {
-    fontSize: 34,
-    lineHeight: 41,
-    fontWeight: 700,
-    letterSpacing: 0.4,
+    fontFamily: DisplayFont.bold,
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: -0.6,
   },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: 700,
+    fontFamily: DisplayFont.bold,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: 600,
+    fontFamily: DisplayFont.bold,
+    fontSize: 21,
+    lineHeight: 27,
+    letterSpacing: -0.3,
   },
   headline: {
     fontSize: 17,
@@ -94,32 +96,31 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   smallBold: {
+    fontFamily: DisplayFont.bold,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 700,
   },
-  // Money uses SF Pro Rounded with tabular figures, as in Apple's Wallet and Fitness.
+  // Money is always the display face with tabular figures, so columns line up
+  // and the number is the loudest thing on the screen.
   amount: {
-    fontFamily: Fonts.rounded,
-    fontSize: 17,
+    fontFamily: DisplayFont.bold,
+    fontSize: 16,
     lineHeight: 22,
-    fontWeight: 600,
+    letterSpacing: -0.2,
     fontVariant: ['tabular-nums'],
   },
   amountLarge: {
-    fontFamily: Fonts.rounded,
-    fontSize: 40,
-    lineHeight: 46,
-    fontWeight: 700,
-    letterSpacing: -0.5,
+    fontFamily: DisplayFont.bold,
+    fontSize: 42,
+    lineHeight: 48,
+    letterSpacing: -1.2,
     fontVariant: ['tabular-nums'],
   },
   display: {
-    fontFamily: Fonts.rounded,
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: 700,
-    letterSpacing: -0.4,
+    fontFamily: DisplayFont.bold,
+    fontSize: 38,
+    lineHeight: 44,
+    letterSpacing: -1,
     fontVariant: ['tabular-nums'],
   },
   link: {
