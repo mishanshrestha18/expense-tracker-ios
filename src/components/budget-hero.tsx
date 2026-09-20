@@ -6,6 +6,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { Radius, Spacing, type Theme } from '@/constants/theme';
 import { type BudgetOverview, budgetPace, type PaceStatus } from '@/domain/budget';
 import { formatPence, formatPenceShort } from '@/domain/money';
+import { ringAmountStyle } from '@/domain/type-scale';
 import { daysInPeriod, daysRemainingInPeriod, type Period } from '@/domain/period';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -161,33 +162,43 @@ export function BudgetHero({
         ) : null}
       </View>
 
-      <BudgetRing
-        ratio={progress.ratio ?? 0}
-        color={ink}
-        trackColor={theme.backgroundElement}
-        accessibilityLabel={summary}>
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.overline}>
-          {over ? 'Over by' : 'Yours to spend'}
-        </ThemedText>
-        <ThemedText type="display" adjustsFontSizeToFit numberOfLines={1}>
-          {formatPence(Math.abs(remainingPence))}
-        </ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          of {formatPence(limitPence)}
-        </ThemedText>
-      </BudgetRing>
+      <View style={styles.ringSpace}>
+        <BudgetRing
+          ratio={progress.ratio ?? 0}
+          color={ink}
+          trackColor={theme.backgroundElement}
+          accessibilityLabel={summary}>
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.overline}>
+            {over ? 'Over by' : 'Yours to spend'}
+          </ThemedText>
+          <ThemedText
+            type="display"
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            numberOfLines={1}
+            style={ringAmountStyle(formatPence(Math.abs(remainingPence)))}>
+            {formatPence(Math.abs(remainingPence))}
+          </ThemedText>
+          <ThemedText type="footnote" themeColor="textSecondary">
+            of {formatPence(limitPence)}
+          </ThemedText>
+        </BudgetRing>
+      </View>
 
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.caption}>
-        {pace.elapsed !== null
-          ? `${usedPercent}% used · ${Math.round(pace.elapsed * 100)}% of the period gone`
-          : `${usedPercent}% of the ${basis === 'monthly' ? 'monthly budget' : 'budgets'} used`}
-      </ThemedText>
-
-      {isCurrent && outlook.length > 0 ? (
-        <ThemedText type="caption" themeColor="textSecondary" style={styles.caption}>
-          {outlook.join(' · ')}
+      {/* Both lines read the ring, so they sit together as one block. */}
+      <View style={styles.captions}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.caption}>
+          {pace.elapsed !== null
+            ? `${usedPercent}% used · ${Math.round(pace.elapsed * 100)}% of the period gone`
+            : `${usedPercent}% of the ${basis === 'monthly' ? 'monthly budget' : 'budgets'} used`}
         </ThemedText>
-      ) : null}
+
+        {isCurrent && outlook.length > 0 ? (
+          <ThemedText type="caption" themeColor="textSecondary" style={styles.caption}>
+            {outlook.join(' · ')}
+          </ThemedText>
+        ) : null}
+      </View>
 
       <View style={[styles.stats, { borderTopColor: theme.separator }]}>
         {stats.map((stat, index) => (
@@ -275,10 +286,19 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    padding: Spacing.four - 4,
+    padding: Spacing.four,
     paddingBottom: Spacing.three,
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  // The headline gets more room than anything else on the card: 16 from the
+  // card's own gap, plus this, top and bottom.
+  ringSpace: {
+    paddingVertical: Spacing.two,
+  },
+  captions: {
+    alignItems: 'center',
+    gap: Spacing.one,
   },
   emptyCard: {
     paddingVertical: Spacing.five,
@@ -322,7 +342,7 @@ const styles = StyleSheet.create({
   stats: {
     alignSelf: 'stretch',
     flexDirection: 'row',
-    paddingTop: Spacing.three - 4,
+    paddingTop: Spacing.three,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   stat: {

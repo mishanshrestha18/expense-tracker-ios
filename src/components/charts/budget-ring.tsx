@@ -85,7 +85,10 @@ export function BudgetRing({
           />
         </Svg>
       </View>
-      <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+      {/* Keep the content off the stroke: the ring's own width, plus air. */}
+      <View
+        style={[StyleSheet.absoluteFill, styles.center, { paddingHorizontal: thickness + 10 }]}
+        pointerEvents="none">
         {children}
       </View>
     </View>
