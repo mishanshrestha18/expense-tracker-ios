@@ -239,6 +239,31 @@ struct BillsDueIntent: AppIntent {
   }
 }
 
+/// "Hey Siri, how much have I saved in my expenses?"
+struct SavingsIntent: AppIntent {
+  static let title: LocalizedStringResource = "Check Savings"
+  static let description: IntentDescription? = IntentDescription(
+    "Says what has rolled into savings, and what this period is on course to add.")
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    guard let budget = Budget(), let balance = budget.snapshot.savingsBalancePence else {
+      return .result(dialog: "Open Expenses once and I'll be able to tell you.")
+    }
+    let saved = "You've got \(Money.pounds(balance)) saved"
+    guard let onCourse = budget.carryPence else {
+      return .result(dialog: "\(saved).")
+    }
+    if onCourse >= 0 {
+      return .result(
+        dialog: "\(saved), and this \(budget.noun) is on course to add \(Money.pounds(onCourse)).")
+    }
+    return .result(
+      dialog:
+        "\(saved), but this \(budget.noun) is on course to take \(Money.pounds(-onCourse)) back out."
+    )
+  }
+}
+
 /// "Hey Siri, am I spending more than last month in my expenses?"
 struct CompareIntent: AppIntent {
   static let title: LocalizedStringResource = "Compare With Before"
@@ -473,6 +498,14 @@ struct ExpensesShortcuts: AppShortcutsProvider {
         "What's due in \(.applicationName)",
         "What bills are coming in \(.applicationName)",
         "What's still to come out of \(.applicationName)",
+      ]
+    )
+    AppShortcut(
+      intent: SavingsIntent(),
+      phrases: [
+        "How much have I saved in \(.applicationName)",
+        "What are my savings in \(.applicationName)",
+        "Check my savings in \(.applicationName)",
       ]
     )
     AppShortcut(

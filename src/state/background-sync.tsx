@@ -3,24 +3,35 @@ import { useEffect, useEffectEvent } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { describePaydayRule } from '@/domain/period';
+import { closeFinishedPeriods } from '@/savings/close-periods';
+import { drainSiriInbox } from '@/siri/inbox-sync';
+import { publishBudgetSnapshot } from '@/siri/snapshot-sync';
 import { useDataVersion } from '@/state/data-version';
 import { useSelectedPeriod } from '@/state/period';
 
-import { drainSiriInbox } from './inbox-sync';
-import { publishBudgetSnapshot } from './snapshot-sync';
-
 /**
- * The bridge to the App Intents: imports whatever Siri and Apple Pay logged
- * while the app was closed, and keeps the budget summary they read up to date.
+ * Everything that has to happen while nobody is looking: close any budget
+ * period that ended, import whatever Siri and Apple Pay logged, and keep the
+ * summary those intents read up to date.
  */
-export function SiriInboxSync() {
+export function BackgroundSync() {
   const db = useSQLiteContext();
   const { version, invalidate } = useDataVersion();
   const { rule } = useSelectedPeriod();
-  // A plain string, so the effect below has a dependency React can check.
+  // A plain string, so the effects below have a dependency React can check.
   const ruleKey = describePaydayRule(rule);
 
-  const sync = useEffectEvent(async () => {
+  const catchUp = useEffectEvent(async () => {
+    try {
+      // A period that ended while the app was shut rolls into savings now.
+      const closed = await closeFinishedPeriods(db, rule);
+      if (closed > 0) invalidate();
+    } catch (error) {
+      console.warn('Could not close the finished periods', error);
+    }
+  });
+
+  const importInbox = useEffectEvent(async () => {
     try {
       const added = await drainSiriInbox(db);
       if (added > 0) invalidate();
@@ -37,11 +48,20 @@ export function SiriInboxSync() {
     }
   });
 
+  // `version` too: setting the first budget is what starts savings off.
+  useEffect(() => {
+    void catchUp();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void catchUp();
+    });
+    return () => subscription.remove();
+  }, [ruleKey, version]);
+
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
-    void sync();
+    void importInbox();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void sync();
+      if (state === 'active') void importInbox();
     });
     return () => subscription.remove();
   }, []);

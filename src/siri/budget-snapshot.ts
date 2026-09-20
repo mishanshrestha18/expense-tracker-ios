@@ -9,6 +9,7 @@ import { listCommitments, listSettlements } from '@/db/commitments';
 import { listCategories } from '@/db/categories';
 import { listExpensesBetween, spendingByCategoryBetween, totalBetween } from '@/db/expenses';
 import { listMerchantRules, type MerchantRule } from '@/db/merchant-rules';
+import { listSavingsEntries } from '@/db/savings';
 import { listIgnoredRecurring } from '@/db/recurring';
 import { getPaymentAlerts } from '@/db/settings';
 import type { Category, Commitment, Db, Expense } from '@/db/types';
@@ -44,6 +45,7 @@ import {
 } from '@/domain/period';
 import { phraseWords } from '@/domain/quick-add';
 import { detectRecurring, totalUpcomingPence, upcomingFees } from '@/domain/recurring';
+import { summariseSavings } from '@/domain/savings';
 
 export const SNAPSHOT_VERSION = 1;
 
@@ -112,6 +114,8 @@ export interface BudgetSnapshot {
   everydaySpentPence: number;
   /** Bills still waiting, soonest first. */
   bills: SnapshotBill[];
+  /** What finished periods have rolled into savings, plus anything moved by hand. */
+  savingsBalancePence: number;
   /** Price changes already pencilled in, soonest first. */
   changes: SnapshotChange[];
   categories: SnapshotCategory[];
@@ -133,6 +137,7 @@ interface SnapshotInput {
   committed: CommittedTotals;
   bills: SnapshotBill[];
   changes: SnapshotChange[];
+  savingsBalancePence: number;
   today: Date;
 }
 
@@ -159,6 +164,7 @@ export function buildSnapshot({
   committed,
   bills,
   changes,
+  savingsBalancePence,
   today,
 }: SnapshotInput): BudgetSnapshot {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
@@ -199,6 +205,7 @@ export function buildSnapshot({
     committed,
     bills,
     changes,
+    savingsBalancePence,
     everydayLimitPence:
       monthlyLimitPence === null
         ? null
@@ -336,6 +343,7 @@ export async function readBudgetSnapshot(
     rules,
     commitments,
     settlements,
+    savingsEntries,
   ] = await Promise.all([
     listCategories(db),
     listBudgets(db),
@@ -346,6 +354,7 @@ export async function readBudgetSnapshot(
     listMerchantRules(db),
     listCommitments(db),
     listSettlements(db, period.start, period.end),
+    listSavingsEntries(db),
   ]);
 
   const occurrences = occurrencesIn(commitments, settlements, period, today);
@@ -394,6 +403,7 @@ export async function readBudgetSnapshot(
     committed,
     bills,
     changes,
+    savingsBalancePence: summariseSavings(savingsEntries).balancePence,
     today,
   });
 }

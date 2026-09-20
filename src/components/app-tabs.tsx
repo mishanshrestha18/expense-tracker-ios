@@ -16,8 +16,8 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="budgets">
         <NativeTabs.Trigger.Label>Budgets</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{ default: 'banknote', selected: 'banknote.fill' }}
-          md="savings"
+          sf={{ default: 'chart.pie', selected: 'chart.pie.fill' }}
+          md="donut_small"
         />
       </NativeTabs.Trigger>
 
@@ -26,6 +26,14 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon
           sf={{ default: 'calendar', selected: 'calendar.badge.clock' }}
           md="event_repeat"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="savings">
+        <NativeTabs.Trigger.Label>Savings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'banknote', selected: 'banknote.fill' }}
+          md="savings"
         />
       </NativeTabs.Trigger>
 

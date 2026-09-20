@@ -20,6 +20,7 @@ Everything is stored on the device. No account, no server.
 - _"Hey Siri, how much can I spend today in my budget?"_ → _"£23 a day keeps you on track."_
 - _"Hey Siri, can I afford it?"_ → _"That would put you £12 over for the rest of the month."_
 - _"Hey Siri, am I spending more than last month?"_ → _"£120 more than this time last month."_
+- _"Hey Siri, how much have I saved?"_ → _"£420 saved, and September is on course to add £181."_
 
 ## Features
 
@@ -61,6 +62,8 @@ Everything is stored on the device. No account, no server.
 - **Bills, and what's actually yours** — rent, the car, subscriptions, monthly, quarterly or
   yearly. The app sets that money aside, so the daily allowance only offers what is genuinely
   free, and tells you a week before a price you already know about goes up.
+- **Savings that keep score** — whatever a period ends under its budget rolls into savings, an
+  overspend comes back out of it, and the tab says what the period in hand is on course to add.
 - **Your data leaves whenever you like** — export every expense as CSV from Settings.
 
 ## Tech stack
@@ -100,6 +103,7 @@ src/
 ├── domain/       Pure business logic: money, dates, quick-add parser, budgets, chart geometry
 ├── db/           Schema, migrations and repositories
 ├── hooks/        Data hooks built on useDbQuery / useDbMutation
+├── savings/      Closing a finished period into the savings pot
 ├── siri/         The App Intents bridge: inbox import and the budget summary
 ├── state/        App-wide context: selected period, data version
 └── test-utils/   In-memory SQLite for tests
@@ -163,6 +167,7 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 - [x] **Comparisons** — against last period, a year ago, and by category, in the app and by voice.
 - [x] **Committed costs** — bills with future price changes, a committed/everyday split, and
       reminders ([design](docs/design/committed-costs.md)).
+- [x] **Savings** — finished periods roll their leftover in, overspends come back out.
 - [ ] **Screenshots and a 20-second demo clip** — see [docs/demo/SHOT-LIST.md](docs/demo/SHOT-LIST.md).
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).

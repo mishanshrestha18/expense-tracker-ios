@@ -36,6 +36,13 @@ import {
   updateExpense,
 } from '../expenses';
 import { migrate } from '../migrate';
+import {
+  addSavingsAdjustment,
+  listCarriedPeriods,
+  listSavingsEntries,
+  recordCarry,
+  removeSavingsEntry,
+} from '../savings';
 import { DEFAULT_CATEGORIES, MIGRATIONS } from '../schema';
 import type { CommitmentInput, Db } from '../types';
 
@@ -397,5 +404,83 @@ describe('commitments', () => {
       '2026-10-01',
     ]);
     expect(await listSettlements(db, '2026-09-01', '2026-09-01')).toEqual([]);
+  });
+});
+
+describe('savings', () => {
+  it('upgrades an existing v5 database without losing data', async () => {
+    const legacy = await createTestDb({ migrated: false });
+    for (const migration of MIGRATIONS.slice(0, 5)) await legacy.execAsync(migration);
+    await legacy.execAsync('PRAGMA user_version = 5');
+    const expenseId = await addExpense(legacy, {
+      amountPence: 90000,
+      categoryId: 4,
+      note: 'Rent',
+      spentOn: '2026-09-01',
+    });
+    await setOverallBudget(legacy, 160000);
+
+    await migrate(legacy);
+
+    expect(await getExpense(legacy, expenseId)).toMatchObject({ amountPence: 90000 });
+    expect(await getOverallBudget(legacy)).toBe(160000);
+    expect(await listSavingsEntries(legacy)).toEqual([]);
+    legacy.close();
+  });
+
+  it('carries a period once, whatever it had left over', async () => {
+    await recordCarry(db, '2026-07', 17650);
+    await recordCarry(db, '2026-08', -11000);
+
+    expect(await listCarriedPeriods(db)).toEqual(['2026-07', '2026-08']);
+    expect(await listSavingsEntries(db)).toMatchObject([
+      { kind: 'carry', periodKey: '2026-08', amountPence: -11000, note: '' },
+      { kind: 'carry', periodKey: '2026-07', amountPence: 17650, note: '' },
+    ]);
+
+    // Closing the same period again leaves the first answer alone.
+    await recordCarry(db, '2026-07', 500);
+    const entries = await listSavingsEntries(db);
+    expect(entries).toHaveLength(2);
+    expect(entries[1].amountPence).toBe(17650);
+  });
+
+  it('moves money in and out by hand', async () => {
+    const id = await addSavingsAdjustment(db, 20000, '  Birthday money  ');
+    await addSavingsAdjustment(db, -5000, 'New tyres');
+
+    expect(await listSavingsEntries(db)).toMatchObject([
+      { kind: 'adjustment', periodKey: null, amountPence: -5000, note: 'New tyres' },
+      { id, kind: 'adjustment', periodKey: null, amountPence: 20000, note: 'Birthday money' },
+    ]);
+    // Adjustments are not periods, so any number of them can sit side by side.
+    expect(await listCarriedPeriods(db)).toEqual([]);
+  });
+
+  it('removes an entry, leaving its period free to close again', async () => {
+    await recordCarry(db, '2026-08', -11000);
+    const [carry] = await listSavingsEntries(db);
+
+    await removeSavingsEntry(db, carry.id);
+    expect(await listSavingsEntries(db)).toEqual([]);
+    expect(await listCarriedPeriods(db)).toEqual([]);
+
+    await recordCarry(db, '2026-08', 2500);
+    expect(await listSavingsEntries(db)).toMatchObject([{ amountPence: 2500 }]);
+  });
+
+  it('lists entries newest first', async () => {
+    await addSavingsAdjustment(db, 1000, 'One');
+    const second = await addSavingsAdjustment(db, 2000, 'Two');
+    await recordCarry(db, '2026-08', 3000);
+
+    expect((await listSavingsEntries(db)).map((e) => e.amountPence)).toEqual([3000, 2000, 1000]);
+
+    // Backdating an entry moves it down the list, id order notwithstanding.
+    await db.runAsync('UPDATE savings_entries SET created_at = ? WHERE id = ?', [
+      '2020-01-01T00:00:00.000Z',
+      second,
+    ]);
+    expect((await listSavingsEntries(db)).map((e) => e.amountPence)).toEqual([3000, 1000, 2000]);
   });
 });

@@ -83,6 +83,25 @@ export interface Commitment {
 
 export type CommitmentInput = Omit<Commitment, 'id' | 'amounts'>;
 
+/**
+ * Money that rolled into savings. A `carry` is what a finished period had
+ * left over, written once when the period closes; a negative one is an
+ * overspend eating into the balance. An `adjustment` is a person moving
+ * money in or out by hand.
+ */
+export type SavingsEntryKind = 'carry' | 'adjustment';
+
+export interface SavingsEntry {
+  id: number;
+  kind: SavingsEntryKind;
+  /** The period a carry came from, e.g. `"2026-09"`; `null` for adjustments. */
+  periodKey: MonthKey | null;
+  /** Positive adds to savings, negative takes from it. */
+  amountPence: number;
+  note: string;
+  createdAt: string;
+}
+
 /** What happened to one occurrence of a commitment. */
 export interface CommitmentSettlement {
   commitmentId: number;

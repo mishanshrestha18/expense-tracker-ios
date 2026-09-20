@@ -3,12 +3,14 @@
  * migration. Each getter falls back to the default when the row is missing or
  * unreadable, so a bad value can never stop the app from starting.
  */
+import type { MonthKey } from '@/domain/dates';
 import { CALENDAR_MONTHS, type PaydayRule } from '@/domain/period';
 
 import type { Db } from './types';
 
 const PAYDAY_KEY = 'payday-rule';
 const PAYMENT_ALERTS_KEY = 'payment-alerts';
+const SAVINGS_ANCHOR_KEY = 'savings-anchor';
 
 export async function getSetting(db: Db, key: string): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>(
@@ -60,4 +62,18 @@ export async function getPaymentAlerts(db: Db): Promise<boolean> {
 
 export async function setPaymentAlerts(db: Db, enabled: boolean): Promise<void> {
   await setSetting(db, PAYMENT_ALERTS_KEY, enabled ? 'on' : 'off');
+}
+
+/**
+ * The first period savings pay attention to: whatever was in progress when a
+ * budget was first set. Months from before then never carried anything, so
+ * they must not land in the pot as untouched budgets.
+ */
+export async function getSavingsAnchor(db: Db): Promise<MonthKey | null> {
+  const value = await getSetting(db, SAVINGS_ANCHOR_KEY);
+  return value !== null && /^\d{4}-\d{2}$/.test(value) ? value : null;
+}
+
+export async function setSavingsAnchor(db: Db, periodKey: MonthKey): Promise<void> {
+  await setSetting(db, SAVINGS_ANCHOR_KEY, periodKey);
 }

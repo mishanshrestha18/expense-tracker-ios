@@ -222,6 +222,7 @@ struct BudgetSnapshot: Decodable {
   let everydayLimitPence: Int?
   let everydaySpentPence: Int?
   let bills: [Bill]?
+  let savingsBalancePence: Int?
   /// What had been spent by this point in earlier periods. Optional so an
   /// older summary still decodes.
   let lastPeriodPence: Int?
@@ -312,6 +313,13 @@ struct Budget {
   }
 
   var bills: [BudgetSnapshot.Bill] { rolledOver ? [] : (snapshot.bills ?? []) }
+
+  /// What this period would put into savings if it closed right now: the whole
+  /// budget less everything spent, bills included. Negative means it comes out.
+  var carryPence: Int? {
+    guard let limit = snapshot.monthlyLimitPence else { return nil }
+    return limit - totalSpentPence
+  }
 
   var upcomingPence: Int { rolledOver ? 0 : snapshot.upcomingPence }
 

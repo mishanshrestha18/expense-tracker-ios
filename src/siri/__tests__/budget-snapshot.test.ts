@@ -41,6 +41,7 @@ const build = (rule: PaydayRule = CALENDAR_MONTHS) =>
       setAsidePence: 5000,
     },
     bills: [{ name: 'Rent', dueOn: '2026-09-25', amountPence: 50000, overdue: false }],
+    savingsBalancePence: 0,
     changes: [{ name: 'Rent', effectiveFrom: '2026-10-01', fromPence: 50000, toPence: 70000 }],
     today: new Date(2026, 8, 19),
   });

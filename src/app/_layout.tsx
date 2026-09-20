@@ -23,7 +23,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { migrate } from '@/db/migrate';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
-import { SiriInboxSync } from '@/siri/siri-inbox-sync';
+import { BackgroundSync } from '@/state/background-sync';
 import { DataVersionProvider } from '@/state/data-version';
 import { PeriodProvider } from '@/state/period';
 
@@ -58,7 +58,7 @@ export default function RootLayout() {
         <DataVersionProvider>
           <PeriodProvider>
             <HideSplashScreen />
-            <SiriInboxSync />
+            <BackgroundSync />
             <Stack
               screenOptions={{
                 headerTintColor: colors.tint,
@@ -86,6 +86,14 @@ export default function RootLayout() {
                 options={{
                   presentation: 'modal',
                   title: 'Monthly budget',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
+                name="savings/adjust"
+                options={{
+                  presentation: 'modal',
+                  title: 'Move money',
                   headerLeft: HeaderCancelButton,
                 }}
               />

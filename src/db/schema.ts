@@ -227,4 +227,21 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (commitment_id, due_on)
   );
   `,
+
+  // v6: savings — what a budget period has left over when it ends, plus the
+  // money a person moves in or out by hand. `amount_pence` is signed, because
+  // an overspend takes back out what earlier periods put in. The partial index
+  // keeps a period from being closed twice.
+  `
+  CREATE TABLE savings_entries (
+    id           INTEGER PRIMARY KEY NOT NULL,
+    kind         TEXT    NOT NULL CHECK (kind IN ('carry', 'adjustment')),
+    period_key   TEXT,
+    amount_pence INTEGER NOT NULL,
+    note         TEXT    NOT NULL DEFAULT '',
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+
+  CREATE UNIQUE INDEX savings_carry_period ON savings_entries (period_key) WHERE kind = 'carry';
+  `,
 ];
