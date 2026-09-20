@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { EmptyState } from '@/components/empty-state';
 import { ExpenseRow } from '@/components/expense-row';
 import { MonthSwitcher } from '@/components/month-switcher';
+import { OverdueBanner } from '@/components/overdue-banner';
 import { QuickAddBar } from '@/components/quick-add-bar';
 import { SpendingSummary } from '@/components/spending-summary';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import {
   usePeriodExpenses,
   usePeriodSpending,
 } from '@/hooks/use-app-data';
+import { usePeriodCommitments } from '@/hooks/use-commitments';
 import { useDbMutation } from '@/hooks/use-db-query';
 import { useUpcomingFees } from '@/hooks/use-recurring';
 import { useSelectedPeriod } from '@/state/period';
@@ -43,12 +45,24 @@ export default function OverviewScreen() {
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
   const paidWith = usePaidWithTotals(period).data ?? [];
-  const upcoming = useUpcomingFees(period);
+  const bills = usePeriodCommitments(period);
+  const upcoming = useUpcomingFees(period, bills.commitments);
 
   const totalPence = spending.reduce((sum, s) => sum + s.totalPence, 0);
-  const { progress, basis } = budgetOverview(spending, budgets, overallBudget);
+  const { progress, basis, everyday } = budgetOverview(
+    spending,
+    budgets,
+    overallBudget,
+    bills.totals,
+  );
+  // Bills are already set aside in the everyday figure, so only the fees the
+  // app spotted by itself still need taking off.
+  const spendable = everyday ?? { progress, committedPence: 0 };
   const allowance = dailyAllowancePence(
-    safeToSpendPence(progress.remainingPence, upcoming.totalPence),
+    safeToSpendPence(
+      spendable.progress.remainingPence,
+      everyday ? bills.totals.outstandingPence : upcoming.totalPence,
+    ),
     daysRemainingInPeriod(period),
   );
   const days = groupByDay(expenses);
@@ -86,12 +100,19 @@ export default function OverviewScreen() {
         }
       />
 
+      <OverdueBanner
+        count={bills.overdue.length}
+        totalPence={bills.totals.overduePence}
+        onPress={() => router.push('/bills')}
+      />
+
       <SpendingSummary
         label={isCurrent ? `Spent this ${noun}` : `Spent in ${formatMonthName(month)}`}
         totalPence={totalPence}
         expenseCount={expenses.length}
-        budget={progress}
-        budgetBasis={basis}
+        budget={spendable.progress}
+        budgetBasis={everyday ? 'everyday' : basis}
+        committedPence={spendable.committedPence}
         dailyAllowancePence={allowance}
         paidWithText={paidWithSummary(paidWith)}
         onSetBudget={() => router.push('/budget/monthly')}

@@ -26,6 +26,9 @@ export default function AppTabs() {
           <TabTrigger name="budgets" href="/budgets" asChild>
             <TabButton>Budgets</TabButton>
           </TabTrigger>
+          <TabTrigger name="bills" href="/bills" asChild>
+            <TabButton>Bills</TabButton>
+          </TabTrigger>
           <TabTrigger name="insights" href="/insights" asChild>
             <TabButton>Insights</TabButton>
           </TabTrigger>

@@ -5,23 +5,32 @@
  * process (see native/LogExpenseIntent.swift).
  */
 import { getOverallBudget, listBudgets } from '@/db/budgets';
+import { listCommitments, listSettlements } from '@/db/commitments';
 import { listCategories } from '@/db/categories';
 import { listExpensesBetween, spendingByCategoryBetween, totalBetween } from '@/db/expenses';
 import { listMerchantRules, type MerchantRule } from '@/db/merchant-rules';
 import { listIgnoredRecurring } from '@/db/recurring';
 import { getPaymentAlerts } from '@/db/settings';
-import type { Category, Db, Expense } from '@/db/types';
+import type { Category, Commitment, Db, Expense } from '@/db/types';
 import { type CategorySpend, forecast } from '@/domain/budget';
 import {
+  type CommittedTotals,
+  committedTotals,
+  nextAmountChange,
+  occurrencesIn,
+} from '@/domain/commitments';
+import {
   addDays,
+  formatDate,
   formatMonthName,
   fromIsoDate,
   type IsoDate,
   shiftMonth,
   toIsoDate,
 } from '@/domain/dates';
-import { formatPence } from '@/domain/money';
+import type { ScheduledAlert } from '@/native/expenses-native';
 import { matchPhrasesFor } from '@/domain/merchant';
+import { formatPence } from '@/domain/money';
 import {
   daysInPeriod,
   daysRemainingInPeriod,
@@ -48,6 +57,20 @@ export interface SnapshotPeriod {
   end: IsoDate;
   /** e.g. "September". */
   label: string;
+}
+
+export interface SnapshotChange {
+  name: string;
+  effectiveFrom: IsoDate;
+  fromPence: number;
+  toPence: number;
+}
+
+export interface SnapshotBill {
+  name: string;
+  dueOn: IsoDate;
+  amountPence: number;
+  overdue: boolean;
 }
 
 export interface SnapshotCategory {
@@ -81,6 +104,16 @@ export interface BudgetSnapshot {
   /** The same stretch of earlier periods, for "am I spending more than last month". */
   lastPeriodPence: number;
   lastYearPence: number;
+  /** What the bills take this period. */
+  committed: CommittedTotals;
+  /** The budget once bills are out of it; `null` without a monthly budget. */
+  everydayLimitPence: number | null;
+  /** Spending that was not one of the bills. */
+  everydaySpentPence: number;
+  /** Bills still waiting, soonest first. */
+  bills: SnapshotBill[];
+  /** Price changes already pencilled in, soonest first. */
+  changes: SnapshotChange[];
   categories: SnapshotCategory[];
 }
 
@@ -97,6 +130,9 @@ interface SnapshotInput {
   rules: readonly MerchantRule[];
   lastPeriodPence: number;
   lastYearPence: number;
+  committed: CommittedTotals;
+  bills: SnapshotBill[];
+  changes: SnapshotChange[];
   today: Date;
 }
 
@@ -120,6 +156,9 @@ export function buildSnapshot({
   rules,
   lastPeriodPence,
   lastYearPence,
+  committed,
+  bills,
+  changes,
   today,
 }: SnapshotInput): BudgetSnapshot {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
@@ -157,6 +196,14 @@ export function buildSnapshot({
     forecastPence: projected?.projectedPence ?? null,
     lastPeriodPence,
     lastYearPence,
+    committed,
+    bills,
+    changes,
+    everydayLimitPence:
+      monthlyLimitPence === null
+        ? null
+        : Math.max(0, monthlyLimitPence - committed.duePence - committed.setAsidePence),
+    everydaySpentPence: Math.max(0, spentPence - committed.paidPence),
     categories: categories.map((category) => ({
       name: category.name,
       limitPence: limitBy.get(category.id) ?? null,
@@ -203,6 +250,73 @@ export function forecastNudge(snapshot: BudgetSnapshot): BudgetNudge | null {
   return { body: `On pace to finish ${formatPence(over)} over${fees}.`, at };
 }
 
+/** The hour bills and changes are announced at. */
+const BILL_ALERT_HOUR = 9;
+const CHANGE_ALERT_HOUR = 10;
+
+/**
+ * Every reminder worth booking: a bill on the day it leaves, a price change a
+ * week before it lands, and the nudge when the period is heading over. All of
+ * it is off unless notifications are on, because one nagging app is one too
+ * many.
+ */
+export function alertsFor(snapshot: BudgetSnapshot): ScheduledAlert[] {
+  if (!snapshot.paymentAlerts) return [];
+  const now = Date.parse(snapshot.generatedAt);
+  const alerts: ScheduledAlert[] = [];
+
+  for (const bill of snapshot.bills) {
+    if (bill.overdue) continue; // The red banner in the app already says so.
+    const at = fromIsoDate(bill.dueOn);
+    at.setHours(BILL_ALERT_HOUR, 0, 0, 0);
+    alerts.push({
+      id: `bill-${bill.name}-${bill.dueOn}`,
+      title: 'Bill due today',
+      body: `${bill.name}, ${formatPence(bill.amountPence)}.`,
+      at,
+    });
+  }
+
+  for (const change of snapshot.changes) {
+    const at = fromIsoDate(addDays(change.effectiveFrom, -CHANGE_NOTICE_DAYS));
+    at.setHours(CHANGE_ALERT_HOUR, 0, 0, 0);
+    alerts.push({
+      id: `change-${change.name}-${change.effectiveFrom}`,
+      title: 'Price change coming',
+      body: `${change.name} goes from ${formatPence(change.fromPence)} to ${formatPence(
+        change.toPence,
+      )} on ${formatDate(change.effectiveFrom)}.`,
+      at,
+    });
+  }
+
+  const nudge = forecastNudge(snapshot);
+  if (nudge) alerts.push({ id: 'forecast', title: 'Before payday', ...nudge });
+
+  return alerts
+    .filter((alert) => alert.at.getTime() > now)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/** Days ahead worth warning about a price change. */
+const CHANGE_HORIZON_DAYS = 60;
+/** Days before a change lands that the warning goes out. */
+const CHANGE_NOTICE_DAYS = 7;
+
+function upcomingChanges(commitments: readonly Commitment[], today: Date): SnapshotChange[] {
+  const horizon = addDays(toIsoDate(today), CHANGE_HORIZON_DAYS);
+  return commitments
+    .map((commitment) => ({ commitment, change: nextAmountChange(commitment, today) }))
+    .filter(({ change }) => change !== null && change.effectiveFrom <= horizon)
+    .map(({ commitment, change }) => ({
+      name: commitment.name,
+      effectiveFrom: change!.effectiveFrom,
+      fromPence: change!.fromPence,
+      toPence: change!.toPence,
+    }))
+    .sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? -1 : 1));
+}
+
 /** Reads everything the snapshot needs out of the database. */
 export async function readBudgetSnapshot(
   db: Db,
@@ -212,16 +326,41 @@ export async function readBudgetSnapshot(
   const period = periodFor(periodKeyOf(toIsoDate(today), rule), rule);
   const next = periodFor(shiftMonth(period.key, 1), rule);
 
-  const [categories, budgets, monthlyLimitPence, spending, ignored, paymentAlerts, rules] =
-    await Promise.all([
-      listCategories(db),
-      listBudgets(db),
-      getOverallBudget(db),
-      spendingByCategoryBetween(db, period.start, period.end),
-      listIgnoredRecurring(db),
-      getPaymentAlerts(db),
-      listMerchantRules(db),
-    ]);
+  const [
+    categories,
+    budgets,
+    monthlyLimitPence,
+    spending,
+    ignored,
+    paymentAlerts,
+    rules,
+    commitments,
+    settlements,
+  ] = await Promise.all([
+    listCategories(db),
+    listBudgets(db),
+    getOverallBudget(db),
+    spendingByCategoryBetween(db, period.start, period.end),
+    listIgnoredRecurring(db),
+    getPaymentAlerts(db),
+    listMerchantRules(db),
+    listCommitments(db),
+    listSettlements(db, period.start, period.end),
+  ]);
+
+  const occurrences = occurrencesIn(commitments, settlements, period, today);
+  const committed = committedTotals(commitments, occurrences, today);
+  const nameOf = new Map(commitments.map((c) => [c.id, c.name]));
+  const bills = occurrences
+    .filter((o) => o.status !== 'paid' && o.status !== 'skipped')
+    .slice(0, 8)
+    .map((o) => ({
+      name: nameOf.get(o.commitmentId) ?? 'Bill',
+      dueOn: o.dueOn,
+      amountPence: o.amountPence,
+      overdue: o.status === 'overdue',
+    }));
+  const changes = upcomingChanges(commitments, today);
 
   const history: Expense[] = await listExpensesBetween(
     db,
@@ -252,6 +391,9 @@ export async function readBudgetSnapshot(
     rules,
     lastPeriodPence,
     lastYearPence,
+    committed,
+    bills,
+    changes,
     today,
   });
 }

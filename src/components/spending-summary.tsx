@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
 import type { BudgetBasis, BudgetProgress } from '@/domain/budget';
-import { formatPence } from '@/domain/money';
+import { formatPence, formatPenceShort } from '@/domain/money';
 import { useTheme } from '@/hooks/use-theme';
 
 interface SpendingSummaryProps {
@@ -15,7 +15,9 @@ interface SpendingSummaryProps {
   expenseCount: number;
   /** Headline budget progress; see `budgetOverview`. */
   budget: BudgetProgress;
-  budgetBasis: BudgetBasis;
+  budgetBasis: BudgetBasis | 'everyday';
+  /** What the bills take this period, when any are set up. */
+  committedPence?: number;
   dailyAllowancePence: number | null;
   /** How the spending was paid for, e.g. "£120 cash · £860 card". */
   paidWithText?: string;
@@ -28,6 +30,7 @@ export function SpendingSummary({
   expenseCount,
   budget,
   budgetBasis,
+  committedPence = 0,
   dailyAllowancePence,
   paidWithText,
   onSetBudget,
@@ -57,6 +60,7 @@ export function SpendingSummary({
               type="footnote"
               style={{ color: budget.status === 'over' ? theme.danger : theme.textSecondary }}>
               {budgetText(budget.remainingPence, budget.limitPence, budgetBasis)}
+              {committedPence > 0 ? ` · ${formatPenceShort(committedPence)} of bills` : ''}
             </ThemedText>
             {dailyAllowancePence !== null ? (
               <ThemedText type="footnote" themeColor="textSecondary">
@@ -74,8 +78,17 @@ export function SpendingSummary({
   );
 }
 
-function budgetText(remainingPence: number, limitPence: number, basis: BudgetBasis): string {
+function budgetText(
+  remainingPence: number,
+  limitPence: number,
+  basis: BudgetBasis | 'everyday',
+): string {
   const limit = formatPence(limitPence);
+  if (basis === 'everyday') {
+    return remainingPence >= 0
+      ? `${formatPence(remainingPence)} left to spend after bills`
+      : `${formatPence(-remainingPence)} over what was left after bills`;
+  }
   if (basis === 'monthly') {
     return remainingPence >= 0
       ? `${formatPence(remainingPence)} left of your ${limit} monthly budget`

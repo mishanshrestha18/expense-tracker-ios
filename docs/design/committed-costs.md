@@ -1,7 +1,36 @@
 # Design: committed costs
 
-Status: **proposed**, awaiting a choice between the variants below.
+Status: **variant C chosen and built**, 2026-09-20.
 Author: drafted 2026-09-20.
+
+## What was built
+
+Variant C, with one decision taken from the open questions: a bill whose due
+date has passed with nothing matched is **not** logged automatically. It counts
+as committed money, and the app says so in red, at the top of the Overview and
+the Budgets tab, until it is marked paid or skipped.
+
+Shipped:
+
+- `commitments`, `commitment_amounts` and `commitment_settlements` (migration v5).
+- The Bills tab: what is due, what is paid, what is overdue, and a starter list
+  so setup is a few taps rather than a blank form.
+- Monthly, quarterly and yearly costs, with a monthly share of the non-monthly
+  ones set aside.
+- A price change dated in advance, e.g. £500 until 1 October 2027 then £700,
+  announced a week before it lands.
+- The committed/everyday split across the ring, the daily allowance, the
+  forecast and Siri.
+- Reminders: a bill on the morning it leaves, a change a week out, and the
+  existing payday nudge — all off unless notifications are on.
+- Siri: "what's due in my expenses?"
+
+Not built yet, deliberately:
+
+- **Automatic matching.** A payment is linked to a bill by tapping Paid. The
+  suggestion flow in "Matching" below is the next step.
+- **A visible pot** for money set aside towards annual costs. The maths counts
+  it; nothing shows the balance building up.
 
 ## Problem
 

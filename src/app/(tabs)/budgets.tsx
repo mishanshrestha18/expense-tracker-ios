@@ -6,6 +6,7 @@ import { BudgetHero } from '@/components/budget-hero';
 import { BudgetRow } from '@/components/budget-row';
 import { StackedBar } from '@/components/charts/stacked-bar';
 import { MonthSwitcher } from '@/components/month-switcher';
+import { OverdueBanner } from '@/components/overdue-banner';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -34,6 +35,7 @@ import {
   useOverallBudget,
   usePeriodSpending,
 } from '@/hooks/use-app-data';
+import { usePeriodCommitments } from '@/hooks/use-commitments';
 import { useUpcomingFees } from '@/hooks/use-recurring';
 import { useTheme } from '@/hooks/use-theme';
 import { useSelectedPeriod } from '@/state/period';
@@ -53,15 +55,19 @@ export default function BudgetsScreen() {
   const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
   const overallBudget = useOverallBudget().data ?? null;
-  const upcoming = useUpcomingFees(period);
+  const bills = usePeriodCommitments(period);
+  const upcoming = useUpcomingFees(period, bills.commitments);
   const [showIdle, setShowIdle] = useState(false);
 
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const limitBy = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
-  const overview = budgetOverview(spending, budgets, overallBudget);
+  const overview = budgetOverview(spending, budgets, overallBudget, bills.totals);
+  // Once bills are set up they are the money already spoken for; before that,
+  // the fees the app spotted by itself play the same part.
+  const setAsidePence = overview.everyday ? bills.totals.outstandingPence : upcoming.totalPence;
   const daysLeft = daysRemainingInPeriod(period);
   const allowance = dailyAllowancePence(
-    safeToSpendPence(overview.progress.remainingPence, upcoming.totalPence),
+    safeToSpendPence((overview.everyday ?? overview).progress.remainingPence, setAsidePence),
     daysLeft,
   );
   const projected =
@@ -69,7 +75,7 @@ export default function BudgetsScreen() {
       ? null
       : forecast(
           overview.totalSpentPence,
-          upcoming.totalPence,
+          setAsidePence,
           daysInPeriod(period) - daysLeft + 1,
           daysLeft - 1,
           overview.progress.limitPence,
@@ -100,12 +106,18 @@ export default function BudgetsScreen() {
         onChange={setMonth}
       />
 
+      <OverdueBanner
+        count={bills.overdue.length}
+        totalPence={bills.totals.overduePence}
+        onPress={() => router.push('/bills')}
+      />
+
       <BudgetHero
         overview={overview}
         period={period}
         periodLabel={formatMonthName(month)}
         allowancePence={allowance}
-        upcomingPence={upcoming.totalPence}
+        upcomingPence={setAsidePence}
         projectedPence={projected?.projectedPence ?? null}
         onEditBudget={() => router.push('/budget/monthly')}
       />

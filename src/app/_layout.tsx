@@ -80,6 +80,22 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
+                name="commitment/new"
+                options={{
+                  presentation: 'modal',
+                  title: 'New bill',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
+                name="commitment/[id]"
+                options={{
+                  presentation: 'modal',
+                  title: 'Edit bill',
+                  headerLeft: HeaderCancelButton,
+                }}
+              />
+              <Stack.Screen
                 name="settings"
                 options={{
                   presentation: 'modal',

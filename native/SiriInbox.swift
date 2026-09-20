@@ -31,6 +31,15 @@ enum CalendarDate {
     string(from: Date())
   }
 
+  /// "25 September", for reading a date out loud.
+  static func spoken(_ iso: String) -> String {
+    guard let date = formatter.date(from: iso) else { return iso }
+    let spoken = DateFormatter()
+    spoken.locale = Locale(identifier: "en_GB")
+    spoken.dateFormat = "d MMMM"
+    return spoken.string(from: date)
+  }
+
   /// Whole days between two calendar dates, ignoring the time of day.
   static func days(from start: String, to end: String) -> Int? {
     guard let first = formatter.date(from: start), let last = formatter.date(from: end) else {
@@ -172,6 +181,21 @@ struct BudgetSnapshot: Decodable {
     let label: String
   }
 
+  struct Committed: Decodable {
+    let duePence: Int
+    let paidPence: Int
+    let outstandingPence: Int
+    let overduePence: Int
+    let setAsidePence: Int
+  }
+
+  struct Bill: Decodable {
+    let name: String
+    let dueOn: String
+    let amountPence: Int
+    let overdue: Bool
+  }
+
   struct CategoryInfo: Decodable {
     let name: String
     let limitPence: Int?
@@ -193,6 +217,11 @@ struct BudgetSnapshot: Decodable {
   /// Optional so an older summary still decodes after an update.
   let paymentAlerts: Bool?
   let forecastPence: Int?
+  /// The bills side of the budget. Optional so an older summary still decodes.
+  let committed: Committed?
+  let everydayLimitPence: Int?
+  let everydaySpentPence: Int?
+  let bills: [Bill]?
   /// What had been spent by this point in earlier periods. Optional so an
   /// older summary still decodes.
   let lastPeriodPence: Int?
@@ -275,9 +304,24 @@ struct Budget {
     (rolledOver ? 0 : snapshot.spentPence) + pendingPence(category: nil)
   }
 
+  /// What the bills take this period, due money plus what is set aside for the
+  /// ones that are not monthly.
+  var committedPence: Int {
+    guard !rolledOver, let committed = snapshot.committed else { return 0 }
+    return committed.duePence + committed.setAsidePence
+  }
+
+  var bills: [BudgetSnapshot.Bill] { rolledOver ? [] : (snapshot.bills ?? []) }
+
   var upcomingPence: Int { rolledOver ? 0 : snapshot.upcomingPence }
 
+  /// What is left of the money that is genuinely free: the budget with the
+  /// bills taken out, less everyday spending.
   var remainingPence: Int? {
+    if committedPence > 0, let everydayLimit = snapshot.everydayLimitPence {
+      let spent = (snapshot.everydaySpentPence ?? snapshot.spentPence) + pendingPence(category: nil)
+      return everydayLimit - spent
+    }
     guard let limit = snapshot.monthlyLimitPence else { return nil }
     return limit - totalSpentPence
   }

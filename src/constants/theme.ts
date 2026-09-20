@@ -25,6 +25,8 @@ export const Colors = {
     /** Warning fills such as progress bars, where brightness matters more than text contrast. */
     warningFill: '#F79009',
     danger: '#D92D20',
+    /** Quiet red wash behind an alert, so the red text still reads. */
+    dangerFill: '#FEE4E2',
   },
   dark: {
     text: '#FFFFFF',
@@ -41,6 +43,7 @@ export const Colors = {
     warning: '#FFB340',
     warningFill: '#FFB340',
     danger: '#FF6961',
+    dangerFill: '#3A1512',
   },
 } as const;
 

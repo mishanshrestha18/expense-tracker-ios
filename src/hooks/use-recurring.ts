@@ -4,8 +4,10 @@
  * daily allowance.
  */
 import { ignoreRecurring } from '@/db/recurring';
+import type { Commitment } from '@/db/types';
 import { shiftMonth } from '@/domain/dates';
 import type { Period } from '@/domain/period';
+import { phraseWords } from '@/domain/quick-add';
 import {
   detectRecurring,
   totalUpcomingPence,
@@ -26,13 +28,24 @@ export interface UpcomingFeesResult {
   ignore: (key: string) => void;
 }
 
-export function useUpcomingFees(period: Period): UpcomingFeesResult {
+export function useUpcomingFees(
+  period: Period,
+  commitments: readonly Commitment[] = [],
+): UpcomingFeesResult {
   const mutate = useDbMutation();
   const historyStart = `${shiftMonth(period.key, -HISTORY_MONTHS)}-01`;
   const history = useExpenseHistory(historyStart, period.end).data ?? [];
   const ignored = new Set(useIgnoredRecurring().data ?? []);
 
-  const series = detectRecurring(history).filter((s) => !ignored.has(s.key));
+  // Anything set up as a bill is already counted; two warnings for one rent
+  // would be worse than none.
+  const committedNames = commitments.map((c) => phraseWords(c.name).join(' ')).filter(Boolean);
+  const series = detectRecurring(history)
+    .filter((s) => !ignored.has(s.key))
+    .filter((s) => {
+      const label = phraseWords(s.label).join(' ');
+      return !committedNames.some((name) => label.includes(name) || name.includes(label));
+    });
   const fees = upcomingFees(series, history, period);
 
   return {

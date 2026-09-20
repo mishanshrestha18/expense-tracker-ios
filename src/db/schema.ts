@@ -194,4 +194,37 @@ export const MIGRATIONS: readonly string[] = [
     updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
   `,
+
+  // v5: committed costs — the bills that leave whether or not anyone opens the
+  // app. An amount is a timeline rather than one number, so "rent goes up in
+  // October 2027" is a row entered today (see docs/design/committed-costs.md).
+  `
+  CREATE TABLE commitments (
+    id           INTEGER PRIMARY KEY NOT NULL,
+    name         TEXT    NOT NULL,
+    category_id  INTEGER NOT NULL REFERENCES categories (id),
+    kind         TEXT    NOT NULL DEFAULT 'fixed',
+    due_day      INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
+    every_months INTEGER NOT NULL DEFAULT 1 CHECK (every_months > 0),
+    anchor_month TEXT    NOT NULL,
+    ended_on     TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+
+  CREATE TABLE commitment_amounts (
+    commitment_id  INTEGER NOT NULL REFERENCES commitments (id) ON DELETE CASCADE,
+    effective_from TEXT    NOT NULL,
+    amount_pence   INTEGER NOT NULL CHECK (amount_pence > 0),
+    PRIMARY KEY (commitment_id, effective_from)
+  );
+
+  CREATE TABLE commitment_settlements (
+    commitment_id INTEGER NOT NULL REFERENCES commitments (id) ON DELETE CASCADE,
+    due_on        TEXT    NOT NULL,
+    status        TEXT    NOT NULL CHECK (status IN ('paid', 'skipped')),
+    expense_id    INTEGER REFERENCES expenses (id) ON DELETE SET NULL,
+    recorded_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (commitment_id, due_on)
+  );
+  `,
 ];

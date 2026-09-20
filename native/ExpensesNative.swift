@@ -4,8 +4,17 @@
 internal import ExpoModulesCore
 import UserNotifications
 
+/// One scheduled reminder, as the app describes it.
+struct AlertRecord: Record {
+  @Field var id: String = ""
+  @Field var title: String = ""
+  @Field var body: String = ""
+  /// Seconds since 1970, local time applied by the calendar trigger.
+  @Field var at: Double = 0
+}
+
 class ExpensesNative: Module {
-  private static let alertIdentifier = "budget-forecast"
+  private static let alertPrefix = "expenses."
   public func definition() -> ModuleDefinition {
     Name("ExpensesNative")
 
@@ -18,31 +27,31 @@ class ExpensesNative: Module {
       }
     }
 
-    // One nudge before the period ends, replaced every time the budget changes.
-    AsyncFunction("scheduleBudgetAlert") { (body: String, at: Double, promise: Promise) in
+    // The whole reminder schedule in one call: bills due, amounts changing, and
+    // the nudge before the period ends. Replaces whatever was booked before, so
+    // nothing lingers after a budget changes.
+    AsyncFunction("setAlerts") { (alerts: [AlertRecord], promise: Promise) in
       let center = UNUserNotificationCenter.current()
-      center.removePendingNotificationRequests(withIdentifiers: [Self.alertIdentifier])
+      center.getPendingNotificationRequests { pending in
+        let ours = pending.map { $0.identifier }.filter { $0.hasPrefix(Self.alertPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ours)
 
-      let when = Date(timeIntervalSince1970: at)
-      guard when > Date() else {
-        promise.resolve(false)
-        return
+        let now = Date().timeIntervalSince1970
+        for alert in alerts where alert.at > now {
+          let content = UNMutableNotificationContent()
+          content.title = alert.title
+          content.body = alert.body
+          let when = Date(timeIntervalSince1970: alert.at)
+          let parts = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute], from: when)
+          center.add(
+            UNNotificationRequest(
+              identifier: Self.alertPrefix + alert.id,
+              content: content,
+              trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
+        }
+        promise.resolve(true)
       }
-      let content = UNMutableNotificationContent()
-      content.title = "Before payday"
-      content.body = body
-      let parts = Calendar.current.dateComponents(
-        [.year, .month, .day, .hour, .minute], from: when)
-      let request = UNNotificationRequest(
-        identifier: Self.alertIdentifier,
-        content: content,
-        trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
-      center.add(request) { _ in promise.resolve(true) }
-    }
-
-    Function("cancelBudgetAlert") {
-      UNUserNotificationCenter.current()
-        .removePendingNotificationRequests(withIdentifiers: [Self.alertIdentifier])
     }
   }
 }

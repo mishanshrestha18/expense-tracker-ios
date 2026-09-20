@@ -135,6 +135,27 @@ export interface CategoryBudget {
  */
 export type BudgetBasis = 'monthly' | 'categories' | 'none';
 
+/** What the bills add up to this period, from `committedTotals`. */
+export interface CommittedSummary {
+  /** Due this period, skipped ones excluded. */
+  duePence: number;
+  /** Of that, what has been matched to a payment. */
+  paidPence: number;
+  /** Monthly share of bills that are not due this period. */
+  setAsidePence: number;
+}
+
+/** The budget once the bills are taken out: money that is genuinely free. */
+export interface EverydayBudget {
+  /** The monthly budget minus committed money. `null` without a monthly budget. */
+  limitPence: number | null;
+  /** Spending that was not one of the bills. */
+  spentPence: number;
+  /** Everything the bills take this period, due or set aside. */
+  committedPence: number;
+  progress: BudgetProgress;
+}
+
 export interface BudgetOverview {
   /** Everything spent in the month, budgeted or not. */
   totalSpentPence: number;
@@ -154,6 +175,8 @@ export interface BudgetOverview {
    * up to more than the monthly budget. `null` without a monthly budget.
    */
   unallocatedPence: number | null;
+  /** Present once any bills are set up; `null` when there are none. */
+  everyday: EverydayBudget | null;
 }
 
 /**
@@ -165,6 +188,7 @@ export function budgetOverview(
   spending: readonly CategorySpend[],
   budgets: readonly CategoryBudget[],
   monthlyLimitPence: number | null = null,
+  committed: CommittedSummary | null = null,
 ): BudgetOverview {
   const limits = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
   let budgetedSpentPence = 0;
@@ -195,5 +219,31 @@ export function budgetOverview(
     basis,
     progress,
     unallocatedPence: monthly === null ? null : monthly - categoryLimitsPence,
+    everyday: everydayBudget(totalSpentPence, monthly, committed),
+  };
+}
+
+/**
+ * Bills are not spending money: they leave whether or not anyone decides
+ * anything. Taking them out of both the limit and what has been spent leaves
+ * the number a person can actually act on.
+ */
+function everydayBudget(
+  totalSpentPence: number,
+  monthlyLimitPence: number | null,
+  committed: CommittedSummary | null,
+): EverydayBudget | null {
+  if (committed === null) return null;
+  const committedPence = committed.duePence + committed.setAsidePence;
+  if (committedPence === 0) return null;
+
+  const limitPence =
+    monthlyLimitPence === null ? null : Math.max(0, monthlyLimitPence - committedPence);
+  const spentPence = Math.max(0, totalSpentPence - committed.paidPence);
+  return {
+    limitPence,
+    spentPence,
+    committedPence,
+    progress: budgetProgress(spentPence, limitPence),
   };
 }

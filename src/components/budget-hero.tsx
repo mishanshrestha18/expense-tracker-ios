@@ -71,7 +71,10 @@ export function BudgetHero({
   projectedPence = null,
   onEditBudget,
 }: BudgetHeroProps) {
-  const { progress, basis } = overview;
+  const { basis, everyday } = overview;
+  // With bills set up, the ring shows what is genuinely free to spend.
+  const progress =
+    everyday?.limitPence === null ? overview.progress : (everyday?.progress ?? overview.progress);
 
   if (basis === 'none' || progress.limitPence === null || progress.remainingPence === null) {
     return <SetBudgetHero onSetBudget={onEditBudget} />;
@@ -117,7 +120,9 @@ export function BudgetHero({
         : `On pace to finish ${formatPenceShort(-difference)} under`,
     );
   }
-  if (upcomingPence > 0) {
+  if (everyday) {
+    outlook.push(`after ${formatPenceShort(everyday.committedPence)} of bills`);
+  } else if (upcomingPence > 0) {
     outlook.push(`${formatPenceShort(upcomingPence)} of fees still to come`);
   }
 

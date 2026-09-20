@@ -89,6 +89,7 @@ Ask about your money:
 - "Hey Siri, what's left for eating out in my expenses?"
 - "Hey Siri, can I afford it in my budget?" → "How much are you thinking?"
 - "Hey Siri, am I spending more than last month in my expenses?"
+- "Hey Siri, what's due in my expenses?"
 
 To use your own words, make a personal shortcut: in the Shortcuts app, tap **+**,
 add the **Add Expense** or **Quick Add** action and name the shortcut something

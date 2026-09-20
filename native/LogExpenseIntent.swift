@@ -205,6 +205,40 @@ struct BudgetLeftIntent: AppIntent {
   }
 }
 
+/// "Hey Siri, what's due in my expenses?"
+struct BillsDueIntent: AppIntent {
+  static let title: LocalizedStringResource = "Check Bills"
+  static let description: IntentDescription? = IntentDescription(
+    "Says which bills are still to come out this period, and which are overdue.")
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    guard let budget = Budget() else {
+      return .result(dialog: "Open Expenses once and I'll be able to tell you.")
+    }
+    let waiting = budget.bills
+    guard !waiting.isEmpty else {
+      return .result(dialog: "Nothing left to come out this \(budget.noun).")
+    }
+
+    let overdue = waiting.filter { $0.overdue }
+    let coming = waiting.filter { !$0.overdue }.prefix(3)
+    var line = ""
+    if !overdue.isEmpty {
+      let total = overdue.reduce(0) { $0 + $1.amountPence }
+      let what = overdue.count == 1 ? "1 bill is overdue" : "\(overdue.count) bills are overdue"
+      line = "\(what), \(Money.pounds(total)). "
+    }
+    if !coming.isEmpty {
+      let list = coming
+        .map { "\($0.name) \(Money.pounds($0.amountPence)) on \(CalendarDate.spoken($0.dueOn))" }
+        .joined(separator: ", ")
+      let outstanding = budget.snapshot.committed?.outstandingPence ?? 0
+      line += "\(Money.pounds(outstanding)) still to go out: \(list)."
+    }
+    return .result(dialog: "\(line)")
+  }
+}
+
 /// "Hey Siri, am I spending more than last month in my expenses?"
 struct CompareIntent: AppIntent {
   static let title: LocalizedStringResource = "Compare With Before"
@@ -431,6 +465,14 @@ struct ExpensesShortcuts: AppShortcutsProvider {
         "Can I afford it in \(.applicationName)",
         "Can I afford this in \(.applicationName)",
         "Check \(.applicationName) before I spend",
+      ]
+    )
+    AppShortcut(
+      intent: BillsDueIntent(),
+      phrases: [
+        "What's due in \(.applicationName)",
+        "What bills are coming in \(.applicationName)",
+        "What's still to come out of \(.applicationName)",
       ]
     )
     AppShortcut(

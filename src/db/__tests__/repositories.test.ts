@@ -11,6 +11,18 @@ import {
   setOverallBudget,
 } from '../budgets';
 import { listCategories } from '../categories';
+import {
+  addCommitment,
+  deleteCommitment,
+  getCommitment,
+  listCommitments,
+  listSettlements,
+  removeCommitmentAmount,
+  setCommitmentAmount,
+  settleCommitment,
+  unsettleCommitment,
+  updateCommitment,
+} from '../commitments';
 import { clearAllData, loadDemoData } from '../demo-data';
 import {
   addExpense,
@@ -25,7 +37,7 @@ import {
 } from '../expenses';
 import { migrate } from '../migrate';
 import { DEFAULT_CATEGORIES, MIGRATIONS } from '../schema';
-import type { Db } from '../types';
+import type { CommitmentInput, Db } from '../types';
 
 let db: Db & { close(): void };
 
@@ -206,5 +218,184 @@ describe('demo data', () => {
     expect(await listBudgets(db)).toEqual([]);
     expect(await getOverallBudget(db)).toBeNull();
     expect(await listCategories(db)).toHaveLength(DEFAULT_CATEGORIES.length);
+  });
+});
+
+describe('commitments', () => {
+  const rent: CommitmentInput = {
+    name: 'Rent',
+    categoryId: 4,
+    kind: 'fixed',
+    dueDay: 1,
+    everyMonths: 1,
+    anchorMonth: '2026-09',
+    endedOn: null,
+  };
+
+  it('upgrades an existing v4 database without losing data', async () => {
+    const legacy = await createTestDb({ migrated: false });
+    for (const migration of MIGRATIONS.slice(0, 4)) await legacy.execAsync(migration);
+    await legacy.execAsync('PRAGMA user_version = 4');
+    const expenseId = await addExpense(legacy, {
+      amountPence: 90000,
+      categoryId: 4,
+      note: 'Rent',
+      spentOn: '2026-09-01',
+    });
+    await setBudget(legacy, 4, 100000);
+
+    await migrate(legacy);
+
+    expect(await getExpense(legacy, expenseId)).toMatchObject({ amountPence: 90000 });
+    expect(await listBudgets(legacy)).toEqual([{ categoryId: 4, monthlyLimitPence: 100000 }]);
+    expect(await listCommitments(legacy)).toEqual([]);
+    legacy.close();
+  });
+
+  it('stores a commitment with the amount it starts on', async () => {
+    const id = await addCommitment(db, { ...rent, name: '  Rent  ' }, 90000, '2026-09-01');
+
+    expect(await getCommitment(db, id)).toEqual({
+      id,
+      ...rent,
+      amounts: [{ effectiveFrom: '2026-09-01', amountPence: 90000 }],
+    });
+    expect(await getCommitment(db, id + 1)).toBeNull();
+  });
+
+  it('lists commitments oldest first with the ended ones last', async () => {
+    const rentId = await addCommitment(db, rent, 90000, '2026-09-01');
+    const gymId = await addCommitment(
+      db,
+      { ...rent, name: 'Gym', categoryId: 7, dueDay: 15, endedOn: '2026-08-31' },
+      3500,
+      '2026-01-01',
+    );
+    const insuranceId = await addCommitment(
+      db,
+      { ...rent, name: 'Car insurance', categoryId: 3, dueDay: 12, everyMonths: 12 },
+      42000,
+      '2026-03-12',
+    );
+
+    const all = await listCommitments(db);
+    expect(all.map((c) => c.id)).toEqual([rentId, insuranceId, gymId]);
+    expect(all.map((c) => c.amounts)).toEqual([
+      [{ effectiveFrom: '2026-09-01', amountPence: 90000 }],
+      [{ effectiveFrom: '2026-03-12', amountPence: 42000 }],
+      [{ effectiveFrom: '2026-01-01', amountPence: 3500 }],
+    ]);
+    expect(all[1].everyMonths).toBe(12);
+  });
+
+  it('keeps a future amount alongside the current one', async () => {
+    const id = await addCommitment(db, rent, 50000, '2026-09-01');
+
+    await setCommitmentAmount(db, id, '2027-10-01', 70000);
+    expect((await getCommitment(db, id))?.amounts).toEqual([
+      { effectiveFrom: '2026-09-01', amountPence: 50000 },
+      { effectiveFrom: '2027-10-01', amountPence: 70000 },
+    ]);
+
+    // Correcting a dated change replaces it rather than adding a second row.
+    await setCommitmentAmount(db, id, '2027-10-01', 72500);
+    expect((await getCommitment(db, id))?.amounts).toEqual([
+      { effectiveFrom: '2026-09-01', amountPence: 50000 },
+      { effectiveFrom: '2027-10-01', amountPence: 72500 },
+    ]);
+    await expect(setCommitmentAmount(db, id, '2028-01-01', 0)).rejects.toThrow();
+
+    await removeCommitmentAmount(db, id, '2027-10-01');
+    expect((await getCommitment(db, id))?.amounts).toEqual([
+      { effectiveFrom: '2026-09-01', amountPence: 50000 },
+    ]);
+  });
+
+  it('updates a commitment and deletes it with everything hanging off it', async () => {
+    const id = await addCommitment(db, rent, 90000, '2026-09-01');
+    await setCommitmentAmount(db, id, '2027-10-01', 95000);
+    await settleCommitment(db, {
+      commitmentId: id,
+      dueOn: '2026-09-01',
+      status: 'paid',
+      expenseId: null,
+    });
+
+    await updateCommitment(db, id, {
+      ...rent,
+      name: 'Rent (new flat)',
+      dueDay: 5,
+      endedOn: '2027-03-31',
+    });
+    expect(await getCommitment(db, id)).toMatchObject({
+      name: 'Rent (new flat)',
+      dueDay: 5,
+      endedOn: '2027-03-31',
+      amounts: [
+        { effectiveFrom: '2026-09-01', amountPence: 90000 },
+        { effectiveFrom: '2027-10-01', amountPence: 95000 },
+      ],
+    });
+
+    await deleteCommitment(db, id);
+    expect(await getCommitment(db, id)).toBeNull();
+    expect(await listSettlements(db, '2026-01-01', '2028-01-01')).toEqual([]);
+    const row = await db.getFirstAsync<{ rows: number }>(
+      'SELECT COUNT(*) AS rows FROM commitment_amounts',
+      [],
+    );
+    expect(row?.rows).toBe(0);
+  });
+
+  it('settles, re-settles and unsettles one occurrence', async () => {
+    const id = await addCommitment(db, rent, 90000, '2026-09-01');
+    const expenseId = await addExpense(db, {
+      amountPence: 90000,
+      categoryId: 4,
+      note: 'Rent',
+      spentOn: '2026-09-01',
+    });
+
+    await settleCommitment(db, {
+      commitmentId: id,
+      dueOn: '2026-09-01',
+      status: 'skipped',
+      expenseId: null,
+    });
+    await settleCommitment(db, {
+      commitmentId: id,
+      dueOn: '2026-09-01',
+      status: 'paid',
+      expenseId,
+    });
+    expect(await listSettlements(db, '2026-09-01', '2026-10-01')).toEqual([
+      { commitmentId: id, dueOn: '2026-09-01', status: 'paid', expenseId },
+    ]);
+
+    // Deleting the expense leaves the occurrence settled, just without a link.
+    await deleteExpense(db, expenseId);
+    expect(await listSettlements(db, '2026-09-01', '2026-10-01')).toEqual([
+      { commitmentId: id, dueOn: '2026-09-01', status: 'paid', expenseId: null },
+    ]);
+
+    await unsettleCommitment(db, id, '2026-09-01');
+    expect(await listSettlements(db, '2026-09-01', '2026-10-01')).toEqual([]);
+  });
+
+  it('lists settlements up to an exclusive end', async () => {
+    const id = await addCommitment(db, rent, 90000, '2026-08-01');
+    for (const dueOn of ['2026-08-01', '2026-09-01', '2026-10-01']) {
+      await settleCommitment(db, { commitmentId: id, dueOn, status: 'paid', expenseId: null });
+    }
+
+    expect((await listSettlements(db, '2026-09-01', '2026-10-01')).map((s) => s.dueOn)).toEqual([
+      '2026-09-01',
+    ]);
+    expect((await listSettlements(db, '2026-08-01', '2026-10-02')).map((s) => s.dueOn)).toEqual([
+      '2026-08-01',
+      '2026-09-01',
+      '2026-10-01',
+    ]);
+    expect(await listSettlements(db, '2026-09-01', '2026-09-01')).toEqual([]);
   });
 });

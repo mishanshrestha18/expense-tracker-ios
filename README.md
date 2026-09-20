@@ -58,6 +58,9 @@ Everything is stored on the device. No account, no server.
   ends when that is where it is heading.
 - **Then versus now** — the same number of days into last period and into last year, plus the
   categories that actually moved ("Eating out £70 less").
+- **Bills, and what's actually yours** — rent, the car, subscriptions, monthly, quarterly or
+  yearly. The app sets that money aside, so the daily allowance only offers what is genuinely
+  free, and tells you a week before a price you already know about goes up.
 - **Your data leaves whenever you like** — export every expense as CSV from Settings.
 
 ## Tech stack
@@ -158,6 +161,8 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 - [x] **Payday budget periods**, recurring-fee detection, and a cash versus card split.
 - [x] **Learned categories**, an end-of-period forecast and CSV export.
 - [x] **Comparisons** — against last period, a year ago, and by category, in the app and by voice.
+- [x] **Committed costs** — bills with future price changes, a committed/everyday split, and
+      reminders ([design](docs/design/committed-costs.md)).
 - [ ] **Screenshots and a 20-second demo clip** — see [docs/demo/SHOT-LIST.md](docs/demo/SHOT-LIST.md).
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).

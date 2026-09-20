@@ -21,6 +21,14 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="bills">
+        <NativeTabs.Trigger.Label>Bills</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'calendar', selected: 'calendar.badge.clock' }}
+          md="event_repeat"
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="insights">
         <NativeTabs.Trigger.Label>Insights</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
