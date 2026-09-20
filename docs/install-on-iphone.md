@@ -87,6 +87,8 @@ Ask about your money:
 
 - "Hey Siri, how much can I spend today in my budget?"
 - "Hey Siri, what's left for eating out in my expenses?"
+- "Hey Siri, can I afford it in my budget?" → "How much are you thinking?"
+- "Hey Siri, am I spending more than last month in my expenses?"
 
 To use your own words, make a personal shortcut: in the Shortcuts app, tap **+**,
 add the **Add Expense** or **Quick Add** action and name the shortcut something
@@ -114,8 +116,10 @@ and £0.00 transit taps are skipped.
 
 To see each tap as it happens — "£3.50 at Pret · £41.00 left for Eating out this
 month" — open **Expenses → Settings** (the gear on the Overview tab) and turn on
-**Notify me when a payment is added**. The same screen sets your **budget
-period**, if your money arrives on payday rather than the 1st.
+**Tell me what's left**. That also sends one nudge a few days before the period
+ends when the pace is heading over. The same screen sets your **budget period**,
+if your money arrives on payday rather than the 1st, and exports your expenses
+as a spreadsheet.
 
 iOS only sees payments made with Apple Pay on the iPhone. Tapping a physical card
 doesn't involve the phone, so those payments can't be added automatically.

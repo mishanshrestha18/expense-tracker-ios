@@ -205,6 +205,34 @@ struct BudgetLeftIntent: AppIntent {
   }
 }
 
+/// "Hey Siri, am I spending more than last month in my expenses?"
+struct CompareIntent: AppIntent {
+  static let title: LocalizedStringResource = "Compare With Before"
+  static let description: IntentDescription? = IntentDescription(
+    "Compares this period with the same point last period and a year ago.")
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    guard let budget = Budget() else {
+      return .result(dialog: "Open Expenses once and I'll be able to tell you.")
+    }
+    let spent = "You've spent \(Money.pounds(budget.totalSpentPence)) this \(budget.noun)"
+    let againstLast = budget.comparedWith(
+      budget.snapshot.lastPeriodPence, label: "this time last \(budget.noun)")
+    let againstYear = budget.comparedWith(budget.snapshot.lastYearPence, label: "a year ago")
+
+    switch (againstLast, againstYear) {
+    case let (last?, year?):
+      return .result(dialog: "\(spent), \(last) and \(year).")
+    case let (last?, nil):
+      return .result(dialog: "\(spent), \(last).")
+    case let (nil, year?):
+      return .result(dialog: "\(spent), \(year).")
+    default:
+      return .result(dialog: "\(spent). There's nothing to compare it with yet.")
+    }
+  }
+}
+
 /// "Hey Siri, can I afford it in my budget?" — asked before spending, not after.
 struct AffordIntent: AppIntent {
   static let title: LocalizedStringResource = "Can I Afford It"
@@ -403,6 +431,15 @@ struct ExpensesShortcuts: AppShortcutsProvider {
         "Can I afford it in \(.applicationName)",
         "Can I afford this in \(.applicationName)",
         "Check \(.applicationName) before I spend",
+      ]
+    )
+    AppShortcut(
+      intent: CompareIntent(),
+      phrases: [
+        "Am I spending more in \(.applicationName)",
+        "Am I spending more than last month in \(.applicationName)",
+        "Compare \(.applicationName) with last month",
+        "How does \(.applicationName) compare",
       ]
     )
     AppShortcut(

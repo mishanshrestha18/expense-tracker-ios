@@ -72,6 +72,13 @@ export function useDailyTotals(start: IsoDate, end: IsoDate) {
   return useDbQuery(`daily:${start}:${end}`, (db) => dailyTotals(db, start, end));
 }
 
+/** Spending by category over any stretch of days, for comparisons. */
+export function useSpendingBetween(start: IsoDate, end: IsoDate) {
+  return useDbQuery(`spending-between:${start}:${end}`, (db) =>
+    spendingByCategoryBetween(db, start, end),
+  );
+}
+
 export function useTotalBetween(start: IsoDate, end: IsoDate) {
   return useDbQuery(`total:${start}:${end}`, (db) => totalBetween(db, start, end));
 }

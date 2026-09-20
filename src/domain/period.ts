@@ -96,19 +96,38 @@ export function periodElapsed(period: Period, today: Date = new Date()): number 
 }
 
 /**
- * The matching stretch of the previous period, for a like-for-like comparison:
- * five days into this period, that is the first five days of the last one.
- * `end` is exclusive.
+ * The matching stretch of an earlier period, for a like-for-like comparison:
+ * five days into this period, that is the first five days of the one
+ * `periodsBack` ago. `end` is exclusive.
  */
+export function samePointPeriodsAgo(
+  key: MonthKey,
+  rule: PaydayRule,
+  periodsBack: number,
+  today: Date = new Date(),
+): { start: IsoDate; end: IsoDate } {
+  const earlier = periodFor(shiftMonth(key, -periodsBack), rule);
+  const elapsed = daysBetween(periodStart(key, rule), toIsoDate(today)) + 1;
+  const days = Math.max(0, Math.min(elapsed, daysInPeriod(earlier)));
+  return { start: earlier.start, end: addDays(earlier.start, days) };
+}
+
+/** The same stretch of the period before this one. */
 export function samePointLastPeriod(
   key: MonthKey,
   rule: PaydayRule,
   today: Date = new Date(),
 ): { start: IsoDate; end: IsoDate } {
-  const previous = periodFor(shiftMonth(key, -1), rule);
-  const elapsed = daysBetween(periodStart(key, rule), toIsoDate(today)) + 1;
-  const days = Math.max(0, Math.min(elapsed, daysInPeriod(previous)));
-  return { start: previous.start, end: addDays(previous.start, days) };
+  return samePointPeriodsAgo(key, rule, 1, today);
+}
+
+/** The same stretch of the period a year ago. */
+export function samePointLastYear(
+  key: MonthKey,
+  rule: PaydayRule,
+  today: Date = new Date(),
+): { start: IsoDate; end: IsoDate } {
+  return samePointPeriodsAgo(key, rule, 12, today);
 }
 
 /** The `count` periods ending with `key`, oldest first. */

@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
+import { CategoryBadge } from '@/components/category-badge';
 import { BarChart } from '@/components/charts/bar-chart';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { EmptyState } from '@/components/empty-state';
@@ -11,6 +12,7 @@ import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Spacing } from '@/constants/theme';
 import { formatMonthName, formatMonthShort } from '@/domain/dates';
+import { change, describeDifference, movers } from '@/domain/compare';
 import { formatPence, formatPenceCompact, formatPenceShort } from '@/domain/money';
 import { paidWithSummary } from '@/domain/paid-with';
 import {
@@ -18,6 +20,7 @@ import {
   periodNoun,
   periodsEndingAt,
   samePointLastPeriod,
+  samePointLastYear,
 } from '@/domain/period';
 import { averageOfActiveMonths, breakdown, bucketByPeriod, percentChange } from '@/domain/summary';
 import {
@@ -26,6 +29,7 @@ import {
   useOverallBudget,
   usePaidWithTotals,
   usePeriodSpending,
+  useSpendingBetween,
   useTotalBetween,
 } from '@/hooks/use-app-data';
 import { useTheme } from '@/hooks/use-theme';
@@ -59,7 +63,14 @@ export default function InsightsScreen() {
   const previousPence = isCurrent
     ? lastPeriodSoFarPence
     : (totals[totals.length - 2]?.totalPence ?? 0);
-  const change = percentChange(totalPence, previousPence);
+  const lastYearSoFar = samePointLastYear(month, rule);
+  const lastYearSoFarPence = useTotalBetween(lastYearSoFar.start, lastYearSoFar.end).data ?? 0;
+  const lastPeriodSpending =
+    useSpendingBetween(lastPeriodSoFar.start, lastPeriodSoFar.end).data ?? [];
+  const biggestMovers = movers(categories, spending, lastPeriodSpending).slice(0, 3);
+  const sinceText = isCurrent ? `this time last ${noun}` : `the ${noun} before`;
+
+  const changeRatio = percentChange(totalPence, previousPence);
   const average = averageOfActiveMonths(totals);
   const top = slices[0];
 
@@ -123,23 +134,23 @@ export default function InsightsScreen() {
           <ThemedText type="footnote" themeColor="textSecondary">
             {isCurrent ? `vs this time last ${noun}` : `vs previous ${noun}`}
           </ThemedText>
-          {change === null ? (
+          {changeRatio === null ? (
             <ThemedText type="subtitle">—</ThemedText>
           ) : (
             <View style={styles.change}>
               <Icon
                 name={
-                  change > 0
+                  changeRatio > 0
                     ? { ios: 'arrow.up.right', material: 'trending_up' }
                     : { ios: 'arrow.down.right', material: 'trending_down' }
                 }
                 size={18}
-                color={change > 0 ? theme.warning : theme.tint}
+                color={changeRatio > 0 ? theme.warning : theme.tint}
               />
               <ThemedText
                 type="subtitle"
-                style={{ color: change > 0 ? theme.warning : theme.tint }}>
-                {Math.abs(Math.round(change * 100))}%
+                style={{ color: changeRatio > 0 ? theme.warning : theme.tint }}>
+                {Math.abs(Math.round(changeRatio * 100))}%
               </ThemedText>
             </View>
           )}
@@ -153,6 +164,52 @@ export default function InsightsScreen() {
           </ThemedText>
         </Card>
       </View>
+
+      <Section title="What changed">
+        <Card flush>
+          <CompareRow
+            label={`Same point last ${noun}`}
+            currentPence={totalPence}
+            previousPence={lastPeriodSoFarPence}
+          />
+          <CompareRow
+            label="Same point last year"
+            currentPence={totalPence}
+            previousPence={lastYearSoFarPence}
+            last
+          />
+        </Card>
+
+        {biggestMovers.length > 0 ? (
+          <Card flush>
+            {biggestMovers.map((row, index) => (
+              <View
+                key={row.item.id}
+                style={[
+                  styles.moverRow,
+                  index < biggestMovers.length - 1 && {
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: theme.separator,
+                  },
+                ]}>
+                <CategoryBadge category={row.item} size={32} />
+                <ThemedText type="callout" style={styles.moverName} numberOfLines={1}>
+                  {row.item.name}
+                </ThemedText>
+                <ThemedText
+                  type="smallBold"
+                  style={{ color: row.differencePence > 0 ? theme.warning : theme.tint }}>
+                  {describeDifference(row.differencePence)}
+                </ThemedText>
+              </View>
+            ))}
+          </Card>
+        ) : null}
+
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.comparedFootnote}>
+          {`Compared with the same number of days into ${sinceText}.`}
+        </ThemedText>
+      </Section>
 
       {top ? (
         <Card style={styles.topCategory}>
@@ -198,7 +255,72 @@ export default function InsightsScreen() {
   );
 }
 
+interface CompareRowProps {
+  label: string;
+  currentPence: number;
+  previousPence: number;
+  last?: boolean;
+}
+
+/** One "then versus now" line: what was spent by this point, and the difference. */
+function CompareRow({ label, currentPence, previousPence, last = false }: CompareRowProps) {
+  const theme = useTheme();
+  const { differencePence } = change(currentPence, previousPence);
+  const nothingThen = previousPence === 0;
+
+  return (
+    <View
+      style={[
+        styles.compareRow,
+        !last && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.separator,
+        },
+      ]}>
+      <View style={styles.compareText}>
+        <ThemedText type="callout">{label}</ThemedText>
+        <ThemedText type="footnote" themeColor="textSecondary">
+          {nothingThen ? 'Nothing recorded then' : formatPence(previousPence)}
+        </ThemedText>
+      </View>
+      {nothingThen ? null : (
+        <ThemedText
+          type="smallBold"
+          style={{ color: differencePence > 0 ? theme.warning : theme.tint }}>
+          {describeDifference(differencePence)}
+        </ThemedText>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  compareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    minHeight: 56,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  compareText: {
+    flex: 1,
+    gap: 1,
+  },
+  moverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - 4,
+    minHeight: 52,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  moverName: {
+    flex: 1,
+  },
+  comparedFootnote: {
+    paddingHorizontal: Spacing.one,
+  },
   breakdown: {
     alignItems: 'center',
     gap: Spacing.four,

@@ -6,7 +6,7 @@
  */
 import { getOverallBudget, listBudgets } from '@/db/budgets';
 import { listCategories } from '@/db/categories';
-import { listExpensesBetween, spendingByCategoryBetween } from '@/db/expenses';
+import { listExpensesBetween, spendingByCategoryBetween, totalBetween } from '@/db/expenses';
 import { listMerchantRules, type MerchantRule } from '@/db/merchant-rules';
 import { listIgnoredRecurring } from '@/db/recurring';
 import { getPaymentAlerts } from '@/db/settings';
@@ -30,6 +30,8 @@ import {
   periodFor,
   periodKeyOf,
   periodNoun,
+  samePointLastPeriod,
+  samePointLastYear,
 } from '@/domain/period';
 import { phraseWords } from '@/domain/quick-add';
 import { detectRecurring, totalUpcomingPence, upcomingFees } from '@/domain/recurring';
@@ -76,6 +78,9 @@ export interface BudgetSnapshot {
   paymentAlerts: boolean;
   /** Where the period is heading at this pace, or `null` before day one is out. */
   forecastPence: number | null;
+  /** The same stretch of earlier periods, for "am I spending more than last month". */
+  lastPeriodPence: number;
+  lastYearPence: number;
   categories: SnapshotCategory[];
 }
 
@@ -90,6 +95,8 @@ interface SnapshotInput {
   upcomingPence: number;
   paymentAlerts: boolean;
   rules: readonly MerchantRule[];
+  lastPeriodPence: number;
+  lastYearPence: number;
   today: Date;
 }
 
@@ -111,6 +118,8 @@ export function buildSnapshot({
   upcomingPence,
   paymentAlerts,
   rules,
+  lastPeriodPence,
+  lastYearPence,
   today,
 }: SnapshotInput): BudgetSnapshot {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
@@ -146,6 +155,8 @@ export function buildSnapshot({
     upcomingPence,
     paymentAlerts,
     forecastPence: projected?.projectedPence ?? null,
+    lastPeriodPence,
+    lastYearPence,
     categories: categories.map((category) => ({
       name: category.name,
       limitPence: limitBy.get(category.id) ?? null,
@@ -217,6 +228,13 @@ export async function readBudgetSnapshot(
     `${shiftMonth(period.key, -HISTORY_MONTHS)}-01`,
     period.end,
   );
+  const lastPeriod = samePointLastPeriod(period.key, rule, today);
+  const lastYear = samePointLastYear(period.key, rule, today);
+  const [lastPeriodPence, lastYearPence] = await Promise.all([
+    totalBetween(db, lastPeriod.start, lastPeriod.end),
+    totalBetween(db, lastYear.start, lastYear.end),
+  ]);
+
   const ignoredKeys = new Set(ignored);
   const series = detectRecurring(history, today).filter((s) => !ignoredKeys.has(s.key));
   const upcomingPence = totalUpcomingPence(upcomingFees(series, history, period, today));
@@ -232,6 +250,8 @@ export async function readBudgetSnapshot(
     upcomingPence,
     paymentAlerts,
     rules,
+    lastPeriodPence,
+    lastYearPence,
     today,
   });
 }

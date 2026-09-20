@@ -193,6 +193,10 @@ struct BudgetSnapshot: Decodable {
   /// Optional so an older summary still decodes after an update.
   let paymentAlerts: Bool?
   let forecastPence: Int?
+  /// What had been spent by this point in earlier periods. Optional so an
+  /// older summary still decodes.
+  let lastPeriodPence: Int?
+  let lastYearPence: Int?
   let categories: [CategoryInfo]
 
   static func load() -> BudgetSnapshot? {
@@ -309,6 +313,16 @@ struct Budget {
       }
     }
     return best?.name
+  }
+
+  /// "£120 more than this time last month", or nil with nothing to compare against.
+  func comparedWith(_ pence: Int?, label: String) -> String? {
+    guard let pence, pence > 0 else { return nil }
+    let difference = totalSpentPence - pence
+    if abs(difference) < 500 { return "about the same as \(label)" }
+    return difference > 0
+      ? "\(Money.pounds(difference)) more than \(label)"
+      : "\(Money.pounds(-difference)) less than \(label)"
   }
 
   /// "At this pace you'll finish £64 over." `nil` when it is too early to say.

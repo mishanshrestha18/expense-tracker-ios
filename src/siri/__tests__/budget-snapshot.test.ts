@@ -31,6 +31,8 @@ const build = (rule: PaydayRule = CALENDAR_MONTHS) =>
     upcomingPence: 6400,
     paymentAlerts: true,
     rules: [{ words: 'shell', categoryId: idOf('Eating out') }],
+    lastPeriodPence: 25000,
+    lastYearPence: 19000,
     today: new Date(2026, 8, 19),
   });
 
@@ -79,6 +81,10 @@ describe('buildSnapshot', () => {
   it('says where the period is heading', () => {
     // £371 over 19 days is £19.53 a day; 11 days to come, plus £64 of fees.
     expect(build().forecastPence).toBe(64979);
+  });
+
+  it('carries what was spent by this point before, for comparisons', () => {
+    expect(build()).toMatchObject({ lastPeriodPence: 25000, lastYearPence: 19000 });
   });
 
   it('follows payday periods', () => {
