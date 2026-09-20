@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -6,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
@@ -14,7 +16,7 @@ import { Spacing, type Theme } from '@/constants/theme';
 import type { SavingsEntry } from '@/db/types';
 import { budgetOverview } from '@/domain/budget';
 import { formatDate, formatMonth, formatMonthName, monthKeyOf } from '@/domain/dates';
-import { allocateGoals, averageCarryPence, type GoalProgress } from '@/domain/goals';
+import { allocateGoals, averageCarryPence, type GoalProgress, reordered } from '@/domain/goals';
 import { formatPence } from '@/domain/money';
 import { periodNoun } from '@/domain/period';
 import { carryPence, type SavingsSummary } from '@/domain/savings';
@@ -30,7 +32,7 @@ export default function SavingsScreen() {
   const router = useRouter();
   const { month, rule, period, isCurrent } = useSelectedPeriod();
   const { entries, summary, loaded } = useSavings();
-  const { goals, loaded: goalsLoaded } = useGoals();
+  const { goals, loaded: goalsLoaded, reorder } = useGoals();
 
   const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
@@ -43,6 +45,16 @@ export default function SavingsScreen() {
   const onCourse = carryPence(overview.monthlyLimitPence, overview.totalSpentPence);
   // The balance shared out over the goals, at the rate recent periods have saved.
   const goalProgress = allocateGoals(goals, summary.balancePence, averageCarryPence(entries));
+
+  /** Changes which goal the balance fills first. */
+  function moveGoal(index: number, delta: number) {
+    const ids = goals.map((goal) => goal.id);
+    const next = reordered(ids, index, delta);
+    if (next.every((id, at) => id === ids[at])) return;
+
+    void Haptics.selectionAsync();
+    void reorder(next);
+  }
   const savedCount = goalProgress.filter((progress) => progress.done).length;
 
   return (
@@ -140,9 +152,17 @@ export default function SavingsScreen() {
                     progress={progress}
                     showSeparator={index < goalProgress.length - 1}
                     onPress={() => router.push(`/savings/goal?id=${progress.goal.id}`)}
+                    onMove={goalProgress.length > 1 ? (delta) => moveGoal(index, delta) : undefined}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < goalProgress.length - 1}
                   />
                 ))}
               </Card>
+              {goalProgress.length > 1 ? (
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.footnote}>
+                  The balance fills these from the top. Move one up to have it filled first.
+                </ThemedText>
+              ) : null}
               <Button
                 title="Add another goal"
                 variant="secondary"
@@ -225,10 +245,17 @@ function GoalRow({
   progress,
   showSeparator,
   onPress,
+  onMove,
+  canMoveUp,
+  canMoveDown,
 }: {
   progress: GoalProgress;
   showSeparator: boolean;
   onPress: () => void;
+  /** Left out when there is only one goal and nothing to reorder. */
+  onMove?: (delta: number) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }) {
   const theme = useTheme();
   const { goal, allocatedPence, ratio, done, behind } = progress;
@@ -237,52 +264,74 @@ function GoalRow({
   const status = goalStatus(progress);
 
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={`${goal.name}: ${amounts}. ${status}`}
-      accessibilityHint="Opens this goal"
-      onPress={onPress}
-      pressedScale={0.98}
-      style={styles.goalRow}>
-      <View style={[styles.dot, { backgroundColor: wash }]}>
-        <Icon
-          name={
-            done ? { ios: 'checkmark', material: 'check' } : { ios: 'flag.fill', material: 'flag' }
-          }
-          size={14}
-          color={ink}
-        />
-      </View>
-      <View
-        style={[
-          styles.goalBody,
-          showSeparator && {
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.separator,
-          },
-        ]}>
-        <ThemedText type="headline" numberOfLines={1}>
-          {goal.name}
-        </ThemedText>
-        <ThemedText type="amount">{amounts}</ThemedText>
-        <ProgressBar ratio={ratio} status={behind ? 'warning' : 'ok'} height={6} />
-        <View style={styles.goalStatus}>
-          {behind ? (
-            <Icon
-              name={{ ios: 'exclamationmark.circle.fill', material: 'error' }}
-              size={12}
-              color={ink}
-            />
-          ) : null}
-          <ThemedText
-            type="footnote"
-            numberOfLines={1}
-            style={{ color: done || behind ? ink : theme.textSecondary }}>
-            {status}
-          </ThemedText>
+    <View style={styles.goalRow}>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={`${goal.name}: ${amounts}. ${status}`}
+        accessibilityHint="Opens this goal"
+        onPress={onPress}
+        pressedScale={0.98}
+        style={styles.goalTap}>
+        <View style={[styles.dot, { backgroundColor: wash }]}>
+          <Icon
+            name={
+              done
+                ? { ios: 'checkmark', material: 'check' }
+                : { ios: 'flag.fill', material: 'flag' }
+            }
+            size={14}
+            color={ink}
+          />
         </View>
-      </View>
-    </PressableScale>
+        <View
+          style={[
+            styles.goalBody,
+            showSeparator && {
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: theme.separator,
+            },
+          ]}>
+          <ThemedText type="headline" numberOfLines={1}>
+            {goal.name}
+          </ThemedText>
+          <ThemedText type="amount">{amounts}</ThemedText>
+          <ProgressBar ratio={ratio} status={behind ? 'warning' : 'ok'} height={6} />
+          <View style={styles.goalStatus}>
+            {behind ? (
+              <Icon
+                name={{ ios: 'exclamationmark.circle.fill', material: 'error' }}
+                size={12}
+                color={ink}
+              />
+            ) : null}
+            <ThemedText
+              type="footnote"
+              numberOfLines={1}
+              style={{ color: done || behind ? ink : theme.textSecondary }}>
+              {status}
+            </ThemedText>
+          </View>
+        </View>
+      </PressableScale>
+      {onMove ? (
+        <View style={styles.goalMove}>
+          <IconButton
+            icon={{ ios: 'chevron.up', material: 'keyboard_arrow_up' }}
+            label={`Move ${goal.name} up, so it is filled sooner`}
+            size={40}
+            disabled={!canMoveUp}
+            onPress={() => onMove(-1)}
+          />
+          <IconButton
+            icon={{ ios: 'chevron.down', material: 'keyboard_arrow_down' }}
+            label={`Move ${goal.name} down, so it is filled later`}
+            size={40}
+            disabled={!canMoveDown}
+            onPress={() => onMove(1)}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -353,6 +402,11 @@ const styles = StyleSheet.create({
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  goalTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.three - 4,
     paddingLeft: Spacing.three,
   },
@@ -367,6 +421,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  goalMove: {
+    gap: Spacing.one,
+    paddingRight: Spacing.two,
   },
   header: {
     gap: 2,

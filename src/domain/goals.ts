@@ -90,3 +90,18 @@ export function averageCarryPence(
   const total = recent.reduce((sum, entry) => sum + entry.amountPence, 0);
   return Math.round(total / recent.length);
 }
+
+/**
+ * The same ids with the one at `index` moved by `delta` places, for the arrows
+ * that change which goal fills first. Returns the order unchanged when the move
+ * would fall off either end, so a button at the end of the list is harmless.
+ */
+export function reordered(ids: readonly number[], index: number, delta: number): number[] {
+  const target = index + delta;
+  if (index < 0 || index >= ids.length || target < 0 || target >= ids.length) return [...ids];
+
+  const moved = [...ids];
+  const [id] = moved.splice(index, 1);
+  moved.splice(target, 0, id);
+  return moved;
+}

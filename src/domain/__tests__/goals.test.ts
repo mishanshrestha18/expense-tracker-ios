@@ -3,7 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import type { SavingsEntry, SavingsEntryKind, SavingsGoal } from '@/db/types';
 
 import type { IsoDate, MonthKey } from '../dates';
-import { allocateGoals, averageCarryPence } from '../goals';
+import { allocateGoals, averageCarryPence, reordered } from '../goals';
 
 /** 19 September 2026: the day every test pretends it is. */
 const TODAY = new Date(2026, 8, 19);
@@ -167,5 +167,33 @@ describe('averageCarryPence', () => {
     const entries = [entry('carry', 9000, '2026-09'), entry('carry', -3000, '2026-08')];
 
     expect(averageCarryPence(entries, 2)).toBe(3000);
+  });
+});
+
+describe('reordered', () => {
+  const ids = [7, 8, 9];
+
+  it('moves a goal up a place, so it fills first', () => {
+    expect(reordered(ids, 1, -1)).toEqual([8, 7, 9]);
+  });
+
+  it('moves a goal down a place', () => {
+    expect(reordered(ids, 0, 1)).toEqual([8, 7, 9]);
+  });
+
+  it('leaves the order alone at either end', () => {
+    expect(reordered(ids, 0, -1)).toEqual(ids);
+    expect(reordered(ids, 2, 1)).toEqual(ids);
+  });
+
+  it('ignores an index that is not there', () => {
+    expect(reordered(ids, 5, -1)).toEqual(ids);
+    expect(reordered([], 0, 1)).toEqual([]);
+  });
+
+  it('never hands back the array it was given', () => {
+    const result = reordered(ids, 0, 1);
+    result.push(10);
+    expect(ids).toEqual([7, 8, 9]);
   });
 });
