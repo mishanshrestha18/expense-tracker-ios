@@ -51,12 +51,15 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "preview": "node scripts/preview.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run map:check && npm test",
+    "map": "node scripts/map.mjs && prettier --write docs/context/MAP.md --log-level warn",
+    "map:check": "node scripts/map.mjs --check"
   },
   "private": true,
   "jest": {

@@ -96,6 +96,13 @@ Everything is stored on the device. No account, no server.
 | iOS builds | IPA built on a GitHub-hosted Mac, installed with Sideloadly — no Mac needed         |
 | Widget     | A WidgetKit target in `targets/`, built with `@bacons/apple-targets` (opt-in)       |
 
+## The map
+
+`docs/context/MAP.md` is generated from the code by `npm run map`: every screen,
+migration, exported function, Swift module and Siri phrase on one page.
+`docs/context/FACTS.md` holds what the code cannot say — signing, free-account
+limits, Expo quirks — so none of it has to be worked out twice.
+
 ## Architecture
 
 ```mermaid
@@ -161,14 +168,16 @@ months of realistic expenses and budgets so the charts have something to show.
 
 ### Scripts
 
-| Command             | What it does                                             |
-| ------------------- | -------------------------------------------------------- |
-| `npm start`         | Start the dev server (open in Expo Go)                   |
-| `npm test`          | Run the Jest suite                                       |
-| `npm run typecheck` | Type-check with `tsc`                                    |
-| `npm run lint`      | Lint with ESLint                                         |
-| `npm run format`    | Format with Prettier                                     |
-| `npm run check`     | Type-check, lint, check formatting and test — same as CI |
+| Command             | What it does                                               |
+| ------------------- | ---------------------------------------------------------- |
+| `npm start`         | Start the dev server (open in Expo Go)                     |
+| `npm test`          | Run the Jest suite                                         |
+| `npm run typecheck` | Type-check with `tsc`                                      |
+| `npm run lint`      | Lint with ESLint                                           |
+| `npm run format`    | Format with Prettier                                       |
+| `npm run check`     | Type-check, lint, formatting, the snapshot contract, tests |
+| `npm run preview`   | Web build with cross-origin isolation, on a fresh origin   |
+| `npm run map`       | Regenerate `docs/context/MAP.md` from the code             |
 
 ## Installing on an iPhone
 
