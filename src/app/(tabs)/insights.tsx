@@ -68,7 +68,7 @@ export default function InsightsScreen() {
   const lastPeriodSpending =
     useSpendingBetween(lastPeriodSoFar.start, lastPeriodSoFar.end).data ?? [];
   const biggestMovers = movers(categories, spending, lastPeriodSpending).slice(0, 3);
-  const sinceText = isCurrent ? `this time last ${noun}` : `the ${noun} before`;
+  const comparedNote = `Counts the same number of days into each ${noun}, so a part-finished ${noun} still compares fairly.`;
 
   const changeRatio = percentChange(totalPence, previousPence);
   const average = averageOfActiveMonths(totals);
@@ -207,7 +207,7 @@ export default function InsightsScreen() {
         ) : null}
 
         <ThemedText type="footnote" themeColor="textSecondary" style={styles.comparedFootnote}>
-          {`Compared with the same number of days into ${sinceText}.`}
+          {comparedNote}
         </ThemedText>
       </Section>
 
