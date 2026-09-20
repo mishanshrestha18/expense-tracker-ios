@@ -7,7 +7,7 @@ period live" or "what does Siri already answer" costs one file instead of
 thirty. Hard-won facts that are **not** in the code — Sideloadly, free-account
 limits, Expo quirks — live next door in [FACTS.md](FACTS.md).
 
-At least 0 tests across 31 suites (`it.each` expands
+At least 0 tests across 32 suites (`it.each` expands
 into more; `npm test` prints the real number). 16 screens,
 8 migrations.
 
@@ -70,6 +70,7 @@ maths in a screen.
 | `period.ts`         | `periodStart`, `periodFor`, `periodKeyOf`, `currentPeriodKey`, `daysInPeriod`, `daysRemainingInPeriod`, `periodElapsed`, `samePointPeriodsAgo`, `samePointLastPeriod`, `samePointLastYear`, `periodsEndingAt`, `formatPeriodRange`, `periodNoun`, `describePaydayRule`, `ordinal`        |
 | `quick-add.ts`      | `parseQuickAdd`, `matchCategory`, `phraseWords`                                                                                                                                                                                                                                          |
 | `recurring.ts`      | `detectRecurring`, `upcomingFees`, `totalUpcomingPence`                                                                                                                                                                                                                                  |
+| `runway.ts`         | `buildRunway`                                                                                                                                                                                                                                                                            |
 | `savings.ts`        | `carryPence`, `summariseSavings`, `periodsToClose`                                                                                                                                                                                                                                       |
 | `search.ts`         | `isEmptyFilter`, `describeFilter`, `summariseResult`                                                                                                                                                                                                                                     |
 | `summary.ts`        | `bucketByPeriod`, `breakdown`, `percentChange`, `averageOfActiveMonths`, `groupByDay`                                                                                                                                                                                                    |

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BudgetHero } from '@/components/budget-hero';
 import { BudgetRow } from '@/components/budget-row';
+import { RunwayChart } from '@/components/charts/runway';
 import { StackedBar } from '@/components/charts/stacked-bar';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { OverdueBanner } from '@/components/overdue-banner';
@@ -24,6 +25,7 @@ import {
 import { formatMonthName } from '@/domain/dates';
 import { describeCarry, envelopeLimit } from '@/domain/envelopes';
 import { formatPence } from '@/domain/money';
+import { buildRunway } from '@/domain/runway';
 import {
   daysInPeriod,
   daysRemainingInPeriod,
@@ -36,6 +38,7 @@ import {
   useOverallBudget,
   usePeriodSpending,
 } from '@/hooks/use-app-data';
+import { useDailyTotals } from '@/hooks/use-app-data';
 import { usePeriodCommitments } from '@/hooks/use-commitments';
 import { useEnvelopes } from '@/hooks/use-envelopes';
 import { useUpcomingFees } from '@/hooks/use-recurring';
@@ -88,6 +91,29 @@ export default function BudgetsScreen() {
         );
   const totalSpent = overview.totalSpentPence;
 
+  // The runway: the whole budget walked forward, day by day, with the bills
+  // still to leave cut out of it on the days they actually go.
+  const daily = useDailyTotals(period.start, period.end).data ?? [];
+  const nameOf = new Map(bills.commitments.map((commitment) => [commitment.id, commitment.name]));
+  const runway = buildRunway({
+    period,
+    today: new Date(),
+    limitPence: overview.progress.limitPence,
+    daily,
+    bills: bills.occurrences
+      .filter((occurrence) => occurrence.status !== 'paid' && occurrence.status !== 'skipped')
+      .map((occurrence) => ({
+        dueOn: occurrence.dueOn,
+        amountPence: occurrence.amountPence,
+        label: nameOf.get(occurrence.commitmentId) ?? 'Bill',
+      })),
+    fees: upcoming.fees.map((fee) => ({
+      dueOn: fee.dueOn,
+      amountPence: fee.amountPence,
+      label: fee.label,
+    })),
+  });
+
   // Biggest spending first; categories with nothing spent keep their usual order.
   // With envelopes on, a limit is money the category keeps: what it did not
   // spend last period is still in it, and an overspend is a debt to pay off.
@@ -134,6 +160,14 @@ export default function BudgetsScreen() {
         projectedPence={projected?.projectedPence ?? null}
         onEditBudget={() => router.push('/budget/monthly')}
       />
+
+      {runway && isCurrent ? (
+        <Section title="Runway" detail={`${daysLeft ?? 0} days left`}>
+          <Card>
+            <RunwayChart runway={runway} />
+          </Card>
+        </Section>
+      ) : null}
 
       <UpcomingFees
         fees={upcoming.fees}
