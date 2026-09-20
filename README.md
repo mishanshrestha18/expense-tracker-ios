@@ -1,10 +1,24 @@
 # Expenses
 
-A personal expense tracker for iPhone, built with **Expo (React Native) and TypeScript**.
+[![CI](https://github.com/mishanshrestha18/expense-tracker-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/mishanshrestha18/expense-tracker-ios/actions/workflows/ci.yml)
+[![iOS build](https://github.com/mishanshrestha18/expense-tracker-ios/actions/workflows/ios-build.yml/badge.svg)](https://github.com/mishanshrestha18/expense-tracker-ios/actions/workflows/ios-build.yml)
+![Expo SDK 57](https://img.shields.io/badge/Expo-SDK%2057-000?logo=expo&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
+![Swift App Intents](https://img.shields.io/badge/Swift-App%20Intents-f05138?logo=swift&logoColor=white)
+
+A personal expense tracker for iPhone, built with **Expo (React Native) and TypeScript**, with
+**Swift App Intents** for Siri and Apple Pay.
+
 Log spending the way you would say it — _"285 groceries"_, _"a tenner on lunch"_ — or don't log
 it at all: Apple Pay taps add themselves, and Siri answers what is left before you spend.
 
 Everything is stored on the device. No account, no server.
+
+**The bit no other tracker does:** it answers back.
+
+- Tap to pay → _"£3.50 at Pret · £41.00 left for Eating out this month."_
+- _"Hey Siri, how much can I spend today in my budget?"_ → _"£23 a day keeps you on track."_
+- _"Hey Siri, can I afford it?"_ → _"That would put you £12 over for the rest of the month."_
 
 ## Features
 
@@ -37,6 +51,11 @@ Everything is stored on the device. No account, no server.
   come this month", and that money is set aside before the daily allowance is worked out.
 - **Cash and cards in one place** — each expense records how it was paid, so the split that
   bank apps miss is right there.
+- **It learns** — re-file a shop once and every later payment from it goes to the same place,
+  in the parser, in Apple Pay and in what Siri says.
+- **Forecast** — "on pace to finish £64 over", and one notification a few days before the period
+  ends when that is where it is heading.
+- **Your data leaves whenever you like** — export every expense as CSV from Settings.
 
 ## Tech stack
 
@@ -132,8 +151,10 @@ builds one on a GitHub-hosted Mac and installs it with a free Apple ID through S
 
 - [x] **Siri** — "Hey Siri, add groceries to my expenses" → "How much?" → "285".
 - [x] **Apple Pay** — payments added automatically through a Wallet transaction automation.
-- [x] **Siri questions** — what's left today, and what's left for a category.
+- [x] **Siri questions** — what's left today, what's left for a category, and "can I afford it?".
 - [x] **Payday budget periods**, recurring-fee detection, and a cash versus card split.
+- [x] **Learned categories**, an end-of-period forecast and CSV export.
+- [ ] **Screenshots and a 20-second demo clip** — see [docs/demo/SHOT-LIST.md](docs/demo/SHOT-LIST.md).
 - [ ] **Siri in one sentence** — "Hey Siri, add £285 to my Groceries list in Expenses", using the
       iOS 27 Reminders schema (needs Expo SDK 58 and Xcode 27).
 - [ ] **Action Button and Back Tap** — one press, say "285 groceries", done.
