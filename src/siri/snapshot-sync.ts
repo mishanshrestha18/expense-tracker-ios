@@ -3,7 +3,9 @@ import { File, Paths } from 'expo-file-system';
 import type { Db } from '@/db/types';
 import type { PaydayRule } from '@/domain/period';
 
-import { readBudgetSnapshot } from './budget-snapshot';
+import { cancelBudgetAlert, scheduleBudgetAlert } from '@/native/expenses-native';
+
+import { forecastNudge, readBudgetSnapshot } from './budget-snapshot';
 
 /** Must match the file read by native/LogExpenseIntent.swift. */
 const SNAPSHOT_FILE = 'budget-snapshot.json';
@@ -21,4 +23,9 @@ export async function publishBudgetSnapshot(
   const file = new File(Paths.document, SNAPSHOT_FILE);
   if (!file.exists) file.create({ overwrite: true });
   file.write(JSON.stringify(snapshot));
+
+  // One nudge before payday, rebooked whenever the outlook changes.
+  const nudge = forecastNudge(snapshot);
+  if (nudge) await scheduleBudgetAlert(nudge.body, nudge.at);
+  else cancelBudgetAlert();
 }

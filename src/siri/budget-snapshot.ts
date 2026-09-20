@@ -7,13 +7,30 @@
 import { getOverallBudget, listBudgets } from '@/db/budgets';
 import { listCategories } from '@/db/categories';
 import { listExpensesBetween, spendingByCategoryBetween } from '@/db/expenses';
+import { listMerchantRules, type MerchantRule } from '@/db/merchant-rules';
 import { listIgnoredRecurring } from '@/db/recurring';
 import { getPaymentAlerts } from '@/db/settings';
 import type { Category, Db, Expense } from '@/db/types';
-import type { CategorySpend } from '@/domain/budget';
-import { formatMonthName, type IsoDate, shiftMonth, toIsoDate } from '@/domain/dates';
+import { type CategorySpend, forecast } from '@/domain/budget';
+import {
+  addDays,
+  formatMonthName,
+  fromIsoDate,
+  type IsoDate,
+  shiftMonth,
+  toIsoDate,
+} from '@/domain/dates';
+import { formatPence } from '@/domain/money';
 import { matchPhrasesFor } from '@/domain/merchant';
-import { type PaydayRule, type Period, periodFor, periodKeyOf, periodNoun } from '@/domain/period';
+import {
+  daysInPeriod,
+  daysRemainingInPeriod,
+  type PaydayRule,
+  type Period,
+  periodFor,
+  periodKeyOf,
+  periodNoun,
+} from '@/domain/period';
 import { phraseWords } from '@/domain/quick-add';
 import { detectRecurring, totalUpcomingPence, upcomingFees } from '@/domain/recurring';
 
@@ -37,6 +54,8 @@ export interface SnapshotCategory {
   spentPence: number;
   /** Words that point at this category, for matching a shop name in Swift. */
   phrases: string[][];
+  /** Shops filed here by hand. Checked before `phrases`. */
+  learned: string[][];
 }
 
 export interface BudgetSnapshot {
@@ -55,6 +74,8 @@ export interface BudgetSnapshot {
   upcomingPence: number;
   /** Whether Apple Pay payments may announce themselves with a notification. */
   paymentAlerts: boolean;
+  /** Where the period is heading at this pace, or `null` before day one is out. */
+  forecastPence: number | null;
   categories: SnapshotCategory[];
 }
 
@@ -68,6 +89,7 @@ interface SnapshotInput {
   rule: PaydayRule;
   upcomingPence: number;
   paymentAlerts: boolean;
+  rules: readonly MerchantRule[];
   today: Date;
 }
 
@@ -88,10 +110,29 @@ export function buildSnapshot({
   rule,
   upcomingPence,
   paymentAlerts,
+  rules,
   today,
 }: SnapshotInput): BudgetSnapshot {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const limitBy = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
+  const learnedBy = new Map<number, string[][]>();
+  for (const rule of rules) {
+    const words = rule.words.split(' ');
+    learnedBy.set(rule.categoryId, [...(learnedBy.get(rule.categoryId) ?? []), words]);
+  }
+
+  const spentPence = spending.reduce((sum, s) => sum + s.totalPence, 0);
+  const daysLeft = daysRemainingInPeriod(period, today);
+  const projected =
+    daysLeft === null
+      ? null
+      : forecast(
+          spentPence,
+          upcomingPence,
+          daysInPeriod(period) - daysLeft + 1,
+          daysLeft - 1,
+          monthlyLimitPence,
+        );
 
   return {
     version: SNAPSHOT_VERSION,
@@ -101,9 +142,10 @@ export function buildSnapshot({
     period: describe(period),
     next: describe(next),
     monthlyLimitPence,
-    spentPence: spending.reduce((sum, s) => sum + s.totalPence, 0),
+    spentPence,
     upcomingPence,
     paymentAlerts,
+    forecastPence: projected?.projectedPence ?? null,
     categories: categories.map((category) => ({
       name: category.name,
       limitPence: limitBy.get(category.id) ?? null,
@@ -111,8 +153,43 @@ export function buildSnapshot({
       phrases: matchPhrasesFor(category)
         .map(phraseWords)
         .filter((words) => words.length > 0),
+      learned: learnedBy.get(category.id) ?? [],
     })),
   };
+}
+
+/** Days before the period ends to warn that it is heading over. */
+const NUDGE_DAYS_BEFORE = 3;
+/** Late enough to be up, early enough to still change the weekend. */
+const NUDGE_HOUR = 10;
+
+export interface BudgetNudge {
+  body: string;
+  at: Date;
+}
+
+/**
+ * The one notification worth sending: a few days before the period ends, when
+ * the pace says it will finish over. `null` when there is nothing to warn
+ * about, or the person has notifications turned off.
+ */
+export function forecastNudge(snapshot: BudgetSnapshot): BudgetNudge | null {
+  if (!snapshot.paymentAlerts) return null;
+  if (snapshot.monthlyLimitPence === null || snapshot.forecastPence === null) return null;
+
+  const over = snapshot.forecastPence - snapshot.monthlyLimitPence;
+  if (over <= 0) return null;
+
+  // `end` is exclusive, so the last day of the period is the day before it.
+  const at = fromIsoDate(addDays(snapshot.period.end, -(NUDGE_DAYS_BEFORE + 1)));
+  at.setHours(NUDGE_HOUR, 0, 0, 0);
+  if (at.getTime() <= Date.parse(snapshot.generatedAt)) return null;
+
+  const fees =
+    snapshot.upcomingPence > 0
+      ? `, with ${formatPence(snapshot.upcomingPence)} of fees still to come out`
+      : '';
+  return { body: `On pace to finish ${formatPence(over)} over${fees}.`, at };
 }
 
 /** Reads everything the snapshot needs out of the database. */
@@ -124,7 +201,7 @@ export async function readBudgetSnapshot(
   const period = periodFor(periodKeyOf(toIsoDate(today), rule), rule);
   const next = periodFor(shiftMonth(period.key, 1), rule);
 
-  const [categories, budgets, monthlyLimitPence, spending, ignored, paymentAlerts] =
+  const [categories, budgets, monthlyLimitPence, spending, ignored, paymentAlerts, rules] =
     await Promise.all([
       listCategories(db),
       listBudgets(db),
@@ -132,6 +209,7 @@ export async function readBudgetSnapshot(
       spendingByCategoryBetween(db, period.start, period.end),
       listIgnoredRecurring(db),
       getPaymentAlerts(db),
+      listMerchantRules(db),
     ]);
 
   const history: Expense[] = await listExpensesBetween(
@@ -153,6 +231,7 @@ export async function readBudgetSnapshot(
     rule,
     upcomingPence,
     paymentAlerts,
+    rules,
     today,
   });
 }

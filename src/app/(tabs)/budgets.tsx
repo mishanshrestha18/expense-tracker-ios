@@ -17,11 +17,17 @@ import {
   type BudgetOverview,
   budgetOverview,
   dailyAllowancePence,
+  forecast,
   safeToSpendPence,
 } from '@/domain/budget';
 import { formatMonthName } from '@/domain/dates';
 import { formatPence } from '@/domain/money';
-import { daysRemainingInPeriod, formatPeriodRange, periodNoun } from '@/domain/period';
+import {
+  daysInPeriod,
+  daysRemainingInPeriod,
+  formatPeriodRange,
+  periodNoun,
+} from '@/domain/period';
 import {
   useBudgets,
   useCategories,
@@ -53,10 +59,21 @@ export default function BudgetsScreen() {
   const spentBy = new Map(spending.map((s) => [s.categoryId, s.totalPence]));
   const limitBy = new Map(budgets.map((b) => [b.categoryId, b.monthlyLimitPence]));
   const overview = budgetOverview(spending, budgets, overallBudget);
+  const daysLeft = daysRemainingInPeriod(period);
   const allowance = dailyAllowancePence(
     safeToSpendPence(overview.progress.remainingPence, upcoming.totalPence),
-    daysRemainingInPeriod(period),
+    daysLeft,
   );
+  const projected =
+    daysLeft === null
+      ? null
+      : forecast(
+          overview.totalSpentPence,
+          upcoming.totalPence,
+          daysInPeriod(period) - daysLeft + 1,
+          daysLeft - 1,
+          overview.progress.limitPence,
+        );
   const totalSpent = overview.totalSpentPence;
 
   // Biggest spending first; categories with nothing spent keep their usual order.
@@ -89,6 +106,7 @@ export default function BudgetsScreen() {
         periodLabel={formatMonthName(month)}
         allowancePence={allowance}
         upcomingPence={upcoming.totalPence}
+        projectedPence={projected?.projectedPence ?? null}
         onEditBudget={() => router.push('/budget/monthly')}
       />
 

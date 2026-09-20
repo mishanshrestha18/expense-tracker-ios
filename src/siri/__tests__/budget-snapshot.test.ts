@@ -4,7 +4,7 @@ import { DEFAULT_CATEGORIES } from '@/db/schema';
 import type { Category } from '@/db/types';
 import { CALENDAR_MONTHS, type PaydayRule, periodFor } from '@/domain/period';
 
-import { buildSnapshot, SNAPSHOT_VERSION } from '../budget-snapshot';
+import { buildSnapshot, forecastNudge, SNAPSHOT_VERSION } from '../budget-snapshot';
 
 const categories: Category[] = DEFAULT_CATEGORIES.map((c, i) => ({
   id: i + 1,
@@ -30,6 +30,7 @@ const build = (rule: PaydayRule = CALENDAR_MONTHS) =>
     rule,
     upcomingPence: 6400,
     paymentAlerts: true,
+    rules: [{ words: 'shell', categoryId: idOf('Eating out') }],
     today: new Date(2026, 8, 19),
   });
 
@@ -69,10 +70,46 @@ describe('buildSnapshot', () => {
     expect(eatingOut.phrases.every((words) => words.length > 0)).toBe(true);
   });
 
+  it('publishes what the app has learned, for Swift to check first', () => {
+    const eatingOut = build().categories.find((c) => c.name === 'Eating out')!;
+    expect(eatingOut.learned).toEqual([['shell']]);
+    expect(build().categories.find((c) => c.name === 'Bills')!.learned).toEqual([]);
+  });
+
+  it('says where the period is heading', () => {
+    // £371 over 19 days is £19.53 a day; 11 days to come, plus £64 of fees.
+    expect(build().forecastPence).toBe(64979);
+  });
+
   it('follows payday periods', () => {
     const snapshot = build({ kind: 'day', day: 25, weekendAdjust: false });
     expect(snapshot.noun).toBe('period');
     expect(snapshot.period.start).toBe('2026-09-25');
     expect(snapshot.next.start).toBe('2026-10-25');
+  });
+});
+
+describe('forecastNudge', () => {
+  // The period ends on 30 September, so the warning lands on the 27th.
+  const heading = () => ({ ...build(), monthlyLimitPence: 50000 });
+
+  it('warns a few days before the period ends', () => {
+    expect(forecastNudge(heading())).toEqual({
+      body: 'On pace to finish £149.79 over, with £64.00 of fees still to come out.',
+      at: new Date(2026, 8, 27, 10, 0, 0, 0),
+    });
+  });
+
+  it('says nothing when the pace is fine', () => {
+    expect(forecastNudge(build())).toBeNull();
+  });
+
+  it('says nothing with notifications turned off', () => {
+    expect(forecastNudge({ ...heading(), paymentAlerts: false })).toBeNull();
+  });
+
+  it('says nothing once that day has passed', () => {
+    const late = { ...heading(), generatedAt: new Date(2026, 8, 29).toISOString() };
+    expect(forecastNudge(late)).toBeNull();
   });
 });

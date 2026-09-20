@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { FormScreen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
 import { Radius, Spacing } from '@/constants/theme';
+import { listCategories } from '@/db/categories';
+import { listExpensesBetween } from '@/db/expenses';
 import { getPaymentAlerts, setPaydayRule, setPaymentAlerts } from '@/db/settings';
+import { exportFileName, toCsv } from '@/domain/export';
 import {
   describePaydayRule,
   formatPeriodRange,
@@ -20,6 +24,7 @@ import { useDbMutation, useDbQuery } from '@/hooks/use-db-query';
 import { useTheme } from '@/hooks/use-theme';
 import { requestPaymentAlerts } from '@/native/expenses-native';
 import { useSelectedPeriod } from '@/state/period';
+import { shareCsv } from '@/utils/share-file';
 
 const DEFAULT_PAYDAY = 25;
 
@@ -29,6 +34,8 @@ export default function SettingsScreen() {
   const { rule, month } = useSelectedPeriod();
   const alerts = useDbQuery('payment-alerts', getPaymentAlerts).data ?? false;
   const [alertError, setAlertError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const day = rule.kind === 'day' ? rule.day : DEFAULT_PAYDAY;
   const weekendAdjust = rule.kind === 'day' ? rule.weekendAdjust : true;
@@ -42,6 +49,22 @@ export default function SettingsScreen() {
       return;
     }
     await mutate((db) => setPaymentAlerts(db, on));
+  }
+
+  async function exportCsv() {
+    setExportMessage(null);
+    setExporting(true);
+    try {
+      // A read, but `mutate` is how a screen reaches the database outside a query.
+      const { expenses, categories } = await mutate(async (db) => ({
+        expenses: await listExpensesBetween(db, '1970-01-01', '2999-12-31'),
+        categories: await listCategories(db),
+      }));
+      const outcome = await shareCsv(exportFileName(new Date()), toCsv(expenses, categories));
+      if (outcome === 'unavailable') setExportMessage("Sharing isn't available here.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -111,11 +134,11 @@ export default function SettingsScreen() {
         </ThemedText>
       </Section>
 
-      <Section title="Apple Pay">
+      <Section title="Notifications">
         <Card>
           <View style={styles.switchRow}>
             <ThemedText type="callout" style={styles.switchLabel}>
-              Notify me when a payment is added
+              Tell me what&rsquo;s left
             </ThemedText>
             <Switch
               value={alerts}
@@ -124,7 +147,8 @@ export default function SettingsScreen() {
             />
           </View>
           <ThemedText type="footnote" themeColor="textSecondary">
-            Each tap shows the amount, the shop and what is left in that category.
+            Every Apple Pay tap shows the amount, the shop and what is left in that category, and a
+            few days before the period ends you hear if it is heading over.
           </ThemedText>
           {alertError ? (
             <ThemedText type="footnote" style={{ color: theme.danger }}>
@@ -136,6 +160,23 @@ export default function SettingsScreen() {
           Payments arrive from the Wallet automation in the Shortcuts app. See
           docs/install-on-iphone.md for the one-time setup.
         </ThemedText>
+      </Section>
+      <Section title="Your data">
+        <Card style={styles.exportCard}>
+          <ThemedText type="callout">Every expense, as a spreadsheet file you can keep.</ThemedText>
+          <Button
+            title="Export as CSV"
+            variant="secondary"
+            icon={{ ios: 'square.and.arrow.up', material: 'share' }}
+            loading={exporting}
+            onPress={() => void exportCsv()}
+          />
+          {exportMessage ? (
+            <ThemedText type="footnote" themeColor="textSecondary">
+              {exportMessage}
+            </ThemedText>
+          ) : null}
+        </Card>
       </Section>
     </FormScreen>
   );
@@ -220,6 +261,9 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     flex: 1,
+  },
+  exportCard: {
+    gap: Spacing.three,
   },
   footnote: {
     paddingHorizontal: Spacing.one,

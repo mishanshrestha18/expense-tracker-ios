@@ -5,6 +5,7 @@ internal import ExpoModulesCore
 import UserNotifications
 
 class ExpensesNative: Module {
+  private static let alertIdentifier = "budget-forecast"
   public func definition() -> ModuleDefinition {
     Name("ExpensesNative")
 
@@ -15,6 +16,33 @@ class ExpensesNative: Module {
         granted, _ in
         promise.resolve(granted)
       }
+    }
+
+    // One nudge before the period ends, replaced every time the budget changes.
+    AsyncFunction("scheduleBudgetAlert") { (body: String, at: Double, promise: Promise) in
+      let center = UNUserNotificationCenter.current()
+      center.removePendingNotificationRequests(withIdentifiers: [Self.alertIdentifier])
+
+      let when = Date(timeIntervalSince1970: at)
+      guard when > Date() else {
+        promise.resolve(false)
+        return
+      }
+      let content = UNMutableNotificationContent()
+      content.title = "Before payday"
+      content.body = body
+      let parts = Calendar.current.dateComponents(
+        [.year, .month, .day, .hour, .minute], from: when)
+      let request = UNNotificationRequest(
+        identifier: Self.alertIdentifier,
+        content: content,
+        trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
+      center.add(request) { _ in promise.resolve(true) }
+    }
+
+    Function("cancelBudgetAlert") {
+      UNUserNotificationCenter.current()
+        .removePendingNotificationRequests(withIdentifiers: [Self.alertIdentifier])
     }
   }
 }

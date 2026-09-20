@@ -177,6 +177,8 @@ struct BudgetSnapshot: Decodable {
     let limitPence: Int?
     let spentPence: Int
     let phrases: [[String]]
+    /// Shops filed here by hand. Optional so an older summary still decodes.
+    let learned: [[String]]?
   }
 
   let version: Int
@@ -190,6 +192,7 @@ struct BudgetSnapshot: Decodable {
   let upcomingPence: Int
   /// Optional so an older summary still decodes after an update.
   let paymentAlerts: Bool?
+  let forecastPence: Int?
   let categories: [CategoryInfo]
 
   static func load() -> BudgetSnapshot? {
@@ -289,6 +292,14 @@ struct Budget {
 
   func categoryName(forMerchant merchant: String) -> String? {
     let words = Matching.words(merchant)
+
+    // What the person has filed by hand wins over the built-in word lists.
+    for category in snapshot.categories {
+      for phrase in category.learned ?? [] where Matching.contains(words, phrase: phrase) {
+        return category.name
+      }
+    }
+
     var best: (name: String, length: Int)?
     for category in snapshot.categories {
       for phrase in category.phrases where Matching.contains(words, phrase: phrase) {
@@ -298,6 +309,19 @@ struct Budget {
       }
     }
     return best?.name
+  }
+
+  /// "At this pace you'll finish £64 over." `nil` when it is too early to say.
+  var forecastLine: String? {
+    guard !rolledOver, let projected = snapshot.forecastPence,
+      let limit = snapshot.monthlyLimitPence
+    else {
+      return nil
+    }
+    let difference = projected - limit
+    return difference > 0
+      ? "At this pace you'll finish \(Money.pounds(difference)) over."
+      : "At this pace you'll finish \(Money.pounds(-difference)) under."
   }
 
   /// "£41 left for Eating out this month." — the line that follows a new expense.

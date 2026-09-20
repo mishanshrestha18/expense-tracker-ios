@@ -6,7 +6,7 @@ import { addExpense } from '@/db/expenses';
 import type { ExpenseInput } from '@/db/types';
 import { periodKeyOf } from '@/domain/period';
 import { parseQuickAdd } from '@/domain/quick-add';
-import { useCategories } from '@/hooks/use-app-data';
+import { useCategories, useCategoryMatchers } from '@/hooks/use-app-data';
 import { useDbMutation } from '@/hooks/use-db-query';
 import { useSelectedPeriod } from '@/state/period';
 
@@ -19,12 +19,13 @@ export default function NewExpenseScreen() {
   const router = useRouter();
   const { text } = useLocalSearchParams<{ text?: string }>();
   const { categories, loaded } = useCategories();
+  const matchers = useCategoryMatchers();
   const mutate = useDbMutation();
   const { setMonth, rule } = useSelectedPeriod();
 
   if (!loaded) return <FormScreen />;
 
-  const parsed = text ? parseQuickAdd(text, categories) : null;
+  const parsed = text ? parseQuickAdd(text, matchers) : null;
   const initial: Partial<ExpenseInput> | undefined = parsed?.ok
     ? {
         amountPence: parsed.amountPence,

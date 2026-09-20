@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ExpenseForm } from '@/components/expense-form';
 import { FormScreen } from '@/components/ui/screen';
 import { deleteExpense, updateExpense } from '@/db/expenses';
+import { rememberMerchantRule } from '@/db/merchant-rules';
 import type { ExpenseInput } from '@/db/types';
 import { formatPence } from '@/domain/money';
 import { useCategories, useExpense } from '@/hooks/use-app-data';
@@ -32,8 +33,17 @@ export default function EditExpenseScreen() {
     );
   }
 
+  const currentCategoryId = expense?.categoryId;
+
   async function save(input: ExpenseInput) {
-    await mutate((db) => updateExpense(db, expenseId, input));
+    const movedCategory = input.categoryId !== currentCategoryId;
+    await mutate(async (db) => {
+      await updateExpense(db, expenseId, input);
+      // Filing "Shell" under Eating out once should file it there next time.
+      if (movedCategory && input.note.trim() !== '') {
+        await rememberMerchantRule(db, input.note, input.categoryId);
+      }
+    });
     router.back();
   }
 

@@ -42,23 +42,64 @@ const MERCHANT_HINTS: Readonly<Record<string, readonly string[]>> = {
   Health: ['superdrug', 'puregym', 'gym group', 'specsavers'],
 };
 
+/** A category the person has chosen by hand for a shop, remembered for next time. */
+export interface LearnedRule {
+  /** Normalised words of the shop name, e.g. `"shell"`. */
+  words: string;
+  categoryId: number;
+}
+
+/** Shop names arrive shouty and punctuated: "UBER *TRIP", "SAINSBURY'S". */
+function tidy(merchant: string): string {
+  return merchant
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // "Caffè" → "Caffe"
+    .replace(/[&*/+.]/g, ' '); // Card statements join words with symbols.
+}
+
 /** Every phrase that points at a category: its name, its aliases and the chains above. */
 export function matchPhrasesFor(category: CategoryMatcher): string[] {
   return [category.name, ...category.aliases, ...(MERCHANT_HINTS[category.name] ?? [])];
 }
 
-/** The best category for a merchant, or `null` when nothing matches. */
+/**
+ * The best category for a merchant, or `null` when nothing matches. Anything
+ * the person has corrected before wins over the built-in lists.
+ */
 export function categoriseMerchant(
   merchant: string,
   categories: readonly CategoryMatcher[],
+  rules: readonly LearnedRule[] = [],
 ): number | null {
-  const matchers = categories.map((category) => ({
+  const text = tidy(merchant);
+
+  const learned = matchCategory(
+    text,
+    rules.map((rule) => ({ id: rule.categoryId, name: '', aliases: [rule.words] })),
+  );
+  if (learned !== null) return learned;
+
+  return matchCategory(text, withHints(categories));
+}
+
+function withHints<T extends CategoryMatcher>(categories: readonly T[]): T[] {
+  return categories.map((category) => ({
     ...category,
     aliases: [...category.aliases, ...(MERCHANT_HINTS[category.name] ?? [])],
   }));
-  const text = merchant
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // "Caffè" → "Caffe"
-    .replace(/[&*/+.]/g, ' '); // Card statements join words with symbols: "UBER *TRIP".
-  return matchCategory(text, matchers);
+}
+
+/** Categories for the quick-add parser, including what the app has learned. */
+export function matchersWithRules<T extends CategoryMatcher>(
+  categories: readonly T[],
+  rules: readonly LearnedRule[],
+): T[] {
+  const byCategory = new Map<number, string[]>();
+  for (const rule of rules) {
+    byCategory.set(rule.categoryId, [...(byCategory.get(rule.categoryId) ?? []), rule.words]);
+  }
+  return withHints(categories).map((category) => ({
+    ...category,
+    aliases: [...(byCategory.get(category.id) ?? []), ...category.aliases],
+  }));
 }

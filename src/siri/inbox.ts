@@ -9,7 +9,7 @@ import { listCategories } from '@/db/categories';
 import { addExpense } from '@/db/expenses';
 import type { Db } from '@/db/types';
 import { fromIsoDate, type IsoDate } from '@/domain/dates';
-import { categoriseMerchant } from '@/domain/merchant';
+import { categoriseMerchant, type LearnedRule } from '@/domain/merchant';
 import { MAX_AMOUNT_PENCE, parseWalletAmount } from '@/domain/money';
 import type { PaidWith } from '@/domain/paid-with';
 import { parseQuickAdd } from '@/domain/quick-add';
@@ -114,7 +114,11 @@ export function parseInboxEntry(raw: string): InboxItem | null {
  * unmatched falls back to "Other" so nothing is lost. Returns how many
  * expenses were added.
  */
-export async function importInboxEntries(db: Db, items: readonly InboxItem[]): Promise<number> {
+export async function importInboxEntries(
+  db: Db,
+  items: readonly InboxItem[],
+  rules: readonly LearnedRule[] = [],
+): Promise<number> {
   if (items.length === 0) return 0;
 
   const categories = await listCategories(db);
@@ -142,7 +146,7 @@ export async function importInboxEntries(db: Db, items: readonly InboxItem[]): P
 
       const categoryId =
         idByName.get(item.category.toLowerCase()) ??
-        (item.merchant === '' ? null : categoriseMerchant(item.merchant, categories)) ??
+        (item.merchant === '' ? null : categoriseMerchant(item.merchant, categories, rules)) ??
         fallbackId;
       await addExpense(db, {
         amountPence: item.amountPence,

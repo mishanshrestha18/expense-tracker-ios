@@ -12,9 +12,15 @@
       "bundleIdentifier": "com.nicklane123.expenses",
       "infoPlist": {
         "INAlternativeAppNames": [
-          { "INAlternativeAppName": "My Expenses" },
-          { "INAlternativeAppName": "My Budget" },
-          { "INAlternativeAppName": "My Spending" }
+          {
+            "INAlternativeAppName": "My Expenses"
+          },
+          {
+            "INAlternativeAppName": "My Budget"
+          },
+          {
+            "INAlternativeAppName": "My Spending"
+          }
         ]
       }
     },
@@ -46,7 +52,8 @@
       ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "./plugins/with-weak-frameworks"
+      "./plugins/with-weak-frameworks",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

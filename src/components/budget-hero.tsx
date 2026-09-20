@@ -52,6 +52,8 @@ interface BudgetHeroProps {
   allowancePence: number | null;
   /** Fees still expected this period, already taken off the allowance. */
   upcomingPence?: number;
+  /** Where the period is heading at this pace; `null` when it is too early to say. */
+  projectedPence?: number | null;
   onEditBudget: () => void;
 }
 
@@ -66,6 +68,7 @@ export function BudgetHero({
   periodLabel,
   allowancePence,
   upcomingPence = 0,
+  projectedPence = null,
   onEditBudget,
 }: BudgetHeroProps) {
   const { progress, basis } = overview;
@@ -103,6 +106,20 @@ export function BudgetHero({
       ? { label: 'Days left', value: String(daysLeft ?? 0) }
       : { label: 'Budget', value: formatPenceShort(limitPence) },
   ];
+
+  // What this period is heading for, and the fees already set aside for it.
+  const outlook: string[] = [];
+  if (projectedPence !== null) {
+    const difference = projectedPence - limitPence;
+    outlook.push(
+      difference > 0
+        ? `On pace to finish ${formatPenceShort(difference)} over`
+        : `On pace to finish ${formatPenceShort(-difference)} under`,
+    );
+  }
+  if (upcomingPence > 0) {
+    outlook.push(`${formatPenceShort(upcomingPence)} of fees still to come`);
+  }
 
   const summary =
     `${basis === 'monthly' ? 'Monthly budget' : 'Category budgets'} for ${periodLabel}: ` +
@@ -154,9 +171,9 @@ export function BudgetHero({
           : `${usedPercent}% of the ${basis === 'monthly' ? 'monthly budget' : 'budgets'} used`}
       </ThemedText>
 
-      {isCurrent && upcomingPence > 0 ? (
+      {isCurrent && outlook.length > 0 ? (
         <ThemedText type="caption" style={[styles.onHeroSecondary, styles.caption]}>
-          {`Per day is after ${formatPence(upcomingPence)} of fees still to come out`}
+          {outlook.join(' · ')}
         </ThemedText>
       ) : null}
 

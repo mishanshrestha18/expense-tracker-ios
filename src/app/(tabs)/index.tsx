@@ -22,6 +22,7 @@ import { groupByDay } from '@/domain/summary';
 import {
   useBudgets,
   useCategories,
+  useCategoryMatchers,
   useOverallBudget,
   usePaidWithTotals,
   usePeriodExpenses,
@@ -35,7 +36,8 @@ export default function OverviewScreen() {
   const router = useRouter();
   const mutate = useDbMutation();
   const { month, setMonth, rule, period, isCurrent } = useSelectedPeriod();
-  const { categories, byId } = useCategories();
+  const { byId } = useCategories();
+  const matchers = useCategoryMatchers();
   const expenses = usePeriodExpenses(period).data ?? [];
   const spending = usePeriodSpending(period).data ?? [];
   const budgets = useBudgets().data ?? [];
@@ -95,7 +97,7 @@ export default function OverviewScreen() {
         onSetBudget={() => router.push('/budget/monthly')}
       />
 
-      <QuickAddBar categories={categories} onAdd={quickAdd} />
+      <QuickAddBar categories={matchers} onAdd={quickAdd} />
 
       {days.length === 0 ? (
         <EmptyState

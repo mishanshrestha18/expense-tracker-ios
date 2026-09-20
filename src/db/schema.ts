@@ -184,4 +184,14 @@ export const MIGRATIONS: readonly string[] = [
     ignored_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
   `,
+
+  // v4: what the app has learned about where a shop belongs, from the
+  // categories a person corrects by hand.
+  `
+  CREATE TABLE merchant_rules (
+    words       TEXT    PRIMARY KEY NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  `,
 ];

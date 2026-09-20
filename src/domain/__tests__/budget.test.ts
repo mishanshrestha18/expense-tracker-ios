@@ -6,6 +6,7 @@ import {
   budgetProgress,
   type BudgetStatus,
   dailyAllowancePence,
+  forecast,
   safeToSpendPence,
 } from '../budget';
 import { CALENDAR_MONTHS, periodFor } from '../period';
@@ -155,5 +156,27 @@ describe('safeToSpendPence', () => {
   it('sets aside the fees still to come out', () => {
     expect(safeToSpendPence(50000, 12000)).toBe(38000);
     expect(safeToSpendPence(null, 12000)).toBeNull();
+  });
+});
+
+describe('forecast', () => {
+  it('carries the pace so far to the end of the period and adds known fees', () => {
+    // £190 over 19 days is £10 a day, 11 days left, plus £64 of fees.
+    expect(forecast(19000, 6400, 19, 11, 160000)).toEqual({
+      projectedPence: 36400,
+      overPence: -123600,
+    });
+  });
+
+  it('measures how far past the budget that lands', () => {
+    expect(forecast(100000, 0, 10, 20, 160000)?.overPence).toBe(140000);
+  });
+
+  it('has nothing to say on day nought', () => {
+    expect(forecast(0, 0, 0, 30, 160000)).toBeNull();
+  });
+
+  it('leaves the comparison out without a budget', () => {
+    expect(forecast(19000, 0, 19, 11, null)?.overPence).toBeNull();
   });
 });

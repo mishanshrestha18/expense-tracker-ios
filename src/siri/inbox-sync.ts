@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
+import { listMerchantRules } from '@/db/merchant-rules';
 import type { Db } from '@/db/types';
 
 import { importInboxEntries, type InboxItem, parseInboxEntry } from './inbox';
@@ -27,7 +28,7 @@ export async function drainSiriInbox(db: Db): Promise<number> {
     if (entry) entries.push(entry);
   }
 
-  const added = await importInboxEntries(db, entries);
+  const added = await importInboxEntries(db, entries, await listMerchantRules(db));
   // Only after the import committed; malformed files are dropped too.
   for (const file of files) file.delete();
   return added;

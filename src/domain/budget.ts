@@ -65,6 +65,34 @@ export function budgetPace(
   return { status, elapsed };
 }
 
+export interface Forecast {
+  /** Where the period looks like ending up. */
+  projectedPence: number;
+  /** How far past the limit that is; negative means under. `null` without a budget. */
+  overPence: number | null;
+}
+
+/**
+ * Where this period is heading: the pace so far carried to the end, plus the
+ * fees still to come. `null` before the first day is over, when a pace would
+ * be guesswork.
+ */
+export function forecast(
+  spentPence: number,
+  upcomingPence: number,
+  daysElapsed: number,
+  daysToCome: number,
+  limitPence: number | null,
+): Forecast | null {
+  if (daysElapsed <= 0 || daysToCome < 0) return null;
+  const perDay = spentPence / daysElapsed;
+  const projectedPence = Math.round(spentPence + perDay * daysToCome + upcomingPence);
+  return {
+    projectedPence,
+    overPence: limitPence === null ? null : projectedPence - limitPence,
+  };
+}
+
 /**
  * What is left once the fees still expected this period are set aside, so the
  * daily allowance does not promise money that rent is about to take.

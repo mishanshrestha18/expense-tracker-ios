@@ -205,6 +205,48 @@ struct BudgetLeftIntent: AppIntent {
   }
 }
 
+/// "Hey Siri, can I afford it in my budget?" — asked before spending, not after.
+struct AffordIntent: AppIntent {
+  static let title: LocalizedStringResource = "Can I Afford It"
+  static let description: IntentDescription? = IntentDescription(
+    "Checks an amount against what is left before you spend it.")
+
+  @Parameter(title: "Amount", requestValueDialog: "How much are you thinking?")
+  var amount: Double
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    let pence = Int((amount * 100).rounded())
+    guard pence > 0, pence <= 100_000_000 else {
+      throw LogExpenseError.invalidAmount
+    }
+    guard let budget = Budget() else {
+      return .result(dialog: "Open Expenses once and I'll be able to tell you.")
+    }
+    guard let remaining = budget.remainingPence else {
+      return .result(
+        dialog:
+          "You've spent \(Money.pounds(budget.totalSpentPence)) this \(budget.noun). Set a monthly budget in Expenses and I can answer that."
+      )
+    }
+
+    // Fees still to come are already spoken for, so they come off first.
+    let after = remaining - budget.upcomingPence - pence
+    if after < 0 {
+      return .result(
+        dialog:
+          "That would put you \(Money.pounds(-after)) over for the rest of the \(budget.noun)."
+      )
+    }
+    guard let days = budget.daysLeft, days > 0 else {
+      return .result(dialog: "Yes — that leaves \(Money.pounds(after)).")
+    }
+    return .result(
+      dialog:
+        "Yes — that leaves \(Money.pounds(after)), about \(Money.pounds(after / days)) a day."
+    )
+  }
+}
+
 /// "Hey Siri, how much can I spend today in my budget?"
 struct SpendTodayIntent: AppIntent {
   static let title: LocalizedStringResource = "Check Today's Allowance"
@@ -237,6 +279,9 @@ struct SpendTodayIntent: AppIntent {
     }
     if budget.upcomingPence > 0 {
       line += " That's after \(Money.pounds(budget.upcomingPence)) of fees still to come out."
+    }
+    if let outlook = budget.forecastLine {
+      line += " \(outlook)"
     }
     return .result(dialog: "\(line)")
   }
@@ -350,6 +395,14 @@ struct ExpensesShortcuts: AppShortcutsProvider {
         "What's left for \(\.$category) in \(.applicationName)",
         "How much is left for \(\.$category) in \(.applicationName)",
         "How much have I spent on \(\.$category) in \(.applicationName)",
+      ]
+    )
+    AppShortcut(
+      intent: AffordIntent(),
+      phrases: [
+        "Can I afford it in \(.applicationName)",
+        "Can I afford this in \(.applicationName)",
+        "Check \(.applicationName) before I spend",
       ]
     )
     AppShortcut(

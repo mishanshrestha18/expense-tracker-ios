@@ -9,9 +9,11 @@ import {
   spendingByCategoryBetween,
   totalBetween,
 } from '@/db/expenses';
+import { listMerchantRules } from '@/db/merchant-rules';
 import { listIgnoredRecurring } from '@/db/recurring';
 import type { Category } from '@/db/types';
 import type { IsoDate } from '@/domain/dates';
+import { matchersWithRules } from '@/domain/merchant';
 import type { Period } from '@/domain/period';
 
 import { useDbQuery } from './use-db-query';
@@ -21,6 +23,21 @@ export function useCategories() {
   const categories = data ?? [];
   const byId = new Map<number, Category>(categories.map((c) => [c.id, c]));
   return { categories, byId, loaded: data !== undefined, error };
+}
+
+/** Shops the person has filed by hand, used before the built-in word lists. */
+export function useMerchantRules() {
+  return useDbQuery('merchant-rules', listMerchantRules);
+}
+
+/**
+ * Categories for the quick-add parser, including everything the app has
+ * learned, so typing "pret" files itself the way you filed it last time.
+ */
+export function useCategoryMatchers(): Category[] {
+  const { categories } = useCategories();
+  const rules = useMerchantRules().data ?? [];
+  return matchersWithRules(categories, rules);
 }
 
 export function usePeriodExpenses(period: Period) {
