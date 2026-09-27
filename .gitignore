@@ -44,3 +44,7 @@ example
 
 # test coverage
 coverage/
+
+# Agent tooling, kept out of the repo
+.claude/
+CLAUDE.md
